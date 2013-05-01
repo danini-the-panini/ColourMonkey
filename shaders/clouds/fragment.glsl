@@ -134,24 +134,25 @@ float snoise(vec4 v)
 uniform vec3 sun;
 uniform float time;
 
-in vec3 g_normal;
-in vec3 g_position;
+in vec3 w_position;
+in vec3 w_cloud;
 in vec3 w_eye;
 
 layout (location = 0) out vec4 colour;
 
 void main()
 {
-    vec3 dir = w_eye - g_position;
+    vec3 dir = w_eye - w_position;
     float dist = length(dir);
 
-    vec3 lookup_pos = g_position;
-    lookup_pos.x += time*2.0f;
+    vec3 lookup_pos = w_cloud;
+    lookup_pos.x += time*2f;
 
     float lookup_time = time*0.07f;
 
-    float noise = snoise(vec4(lookup_pos*0.05f,lookup_time));
+    float noise = 0.5f*snoise(vec4(lookup_pos*0.05f,lookup_time));
     noise += snoise(vec4(lookup_pos*0.01f,lookup_time));
+    noise += 2*snoise(vec4(lookup_pos*0.005f,lookup_time));
 
     //noise /= 3;
 
@@ -163,5 +164,6 @@ void main()
     float foo = pow(max(dot(l,-normalize(dir)),0),20);
 
     colour = vec4(vec3(noise+foo),noise*fog_factor*0.2f);
+    //colour = vec4(vec3(noise+foo,0,noise+foo),fog_factor*0.5f);
 }
 

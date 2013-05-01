@@ -42,7 +42,7 @@ public class ColourMonkey
     SkyBox skybox;
     
     Shader shiny, cloudShader;
-    Quad water, clouds;
+    Grid water, clouds;
     
     FrameBuffer reflectBuffer;
     
@@ -97,7 +97,8 @@ public class ColourMonkey
     float FAR = -100.0f;
     
     float water_level = -5.0f;
-    float cloud_level = 20.0f;
+    float cloud_level = 30.0f;
+    float earth_radius = 100.0f;
     
     Mat4 world, view, projection;
     Mat4 mirror_view;
@@ -187,9 +188,9 @@ public class ColourMonkey
     void renderScene(GL4 gl, Mat4 camera)
     {
         renderSkybox(gl, camera);
-        renderClouds(gl, camera, time);
         renderTerrain(gl, camera);
         renderMesh(gl, camera);
+        renderClouds(gl, camera, time);
         gl.glDisable(GL.GL_BLEND);
     }
     
@@ -236,24 +237,24 @@ public class ColourMonkey
     
     void renderClouds(GL4 gl, Mat4 camera, float time)
     {
+        gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
+        gl.glEnable(GL.GL_BLEND);
+        //gl.glPolygonMode( GL.GL_FRONT_AND_BACK, GL4.GL_LINE );
         cloudShader.use(gl);
         
+        cloudShader.updateUniform(gl, "world", world);
         cloudShader.updateUniform(gl, "view", camera);
         cloudShader.updateUniform(gl, "projection", projection);
         cloudShader.updateUniform(gl, "time", time);
         cloudShader.updateUniform(gl, "sun", sun);
         
-        final int CLOUD_LAYERS = 1;
-        final float LAYER_GAP = 1.0f;
+        cloudShader.updateUniform(gl, "radius", earth_radius);
+        cloudShader.updateUniform(gl, "cloud_height", cloud_level);
         
-        for (int i = CLOUD_LAYERS; i > 0; i--)
-        {
-            gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
-            gl.glEnable(GL.GL_BLEND);
-                cloudShader.updateUniform(gl, "world", Matrices.translate(new Mat4(1.0f), new Vec3(0.0f, LAYER_GAP*i,0.0f)));
-                clouds.draw(gl);
-            gl.glDisable(GL.GL_BLEND);
-        }
+        clouds.draw(gl);
+        
+        gl.glDisable(GL.GL_BLEND);
+       // gl.glPolygonMode( GL.GL_FRONT_AND_BACK, GL4.GL_FILL );
         
     }
     
@@ -313,12 +314,12 @@ public class ColourMonkey
         currentShader = shaders.get(shaderIndex);
         
         shiny = new Shader(gl, "water");
-        water = new Quad(gl, 512, 512, water_level);
+        water = new Grid(gl, 512, 512, 20, 20, water_level);
         
         cloudShader = new Shader(gl, "clouds");
-        clouds = new Quad(gl, 2048, 2048, cloud_level, true);
+        clouds = new Grid(gl, 2048, 2048, 256, 256, cloud_level, true);
         
-        reflectBuffer = new FrameBuffer(gl, w_width/8, w_height/8); // fraction of screen size for performance
+        reflectBuffer = new FrameBuffer(gl, w_width, w_height);
         
         sbShader = new Shader(gl, "skybox");
         
@@ -480,7 +481,7 @@ public class ColourMonkey
     {
         world = new Mat4(1f);
 
-        Vec3 translation = new Vec3(xMove, yMove, zMove);
+        /*Vec3 translation = new Vec3(xMove, yMove, zMove);
         world = Matrices.translate(world, translation);
 
         Vec3 xAxis = new Vec3(1, 0, 0);
@@ -493,6 +494,6 @@ public class ColourMonkey
         world = Matrices.rotate(world, zRot, zAxis);
 
         Vec3 scales = new Vec3(xScale, yScale, zScale);
-        world = Matrices.scale(world, scales);
+        world = Matrices.scale(world, scales);*/
     }
 }
