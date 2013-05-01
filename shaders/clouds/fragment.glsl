@@ -133,37 +133,111 @@ float snoise(vec4 v)
 
 uniform vec3 sun;
 uniform float time;
+uniform float fog_start;
+uniform float fog_end;
+uniform float speed;
+uniform float density;
+uniform float scale;
 
 in vec3 w_position;
-in vec3 w_cloud;
 in vec3 w_eye;
 
 layout (location = 0) out vec4 colour;
+
+const vec3 skytop = vec3(0.08984375f, 0.27734375f, 0.41796875f);
+const vec3 skymid = vec3(0.40625f, 0.65234375f, 0.66796875f);
+const vec3 skybot = vec3(0.78125f, 0.87890625f, 0.83203125f);
+
+vec4 samplesky(vec3 dir)
+{
+    vec3 l = normalize(sun);
+
+    vec3 sun_colour;
+
+    sun_colour.r = pow(max(dot(-l,-dir),0),90.0f);
+    sun_colour.g = pow(max(dot(-l,-dir),0),200.0f);
+    sun_colour.b = pow(max(dot(-l,-dir),0),300.0f);
+
+    vec3 sky;
+    if (dir.y > 0)
+    {
+        sky = mix(skymid, skytop, dir.y);
+    }
+    else
+    {
+        sky = mix(skymid, skybot, -dir.y);
+    }
+
+    return vec4(clamp(sky+sun_colour,0,1),1.0f);
+}
+
+float mnoise(vec3 v, float t)
+{
+
+    float iterations = 3.0;
+    float nstep = 0.2;
+
+    float noise = 0.0;
+    float sscale = 0.5;
+
+    for (float i = 0.0; i < iterations; i+=1.0)
+    {
+        noise += snoise(vec4(v*sscale,t))/sscale;
+        sscale *= nstep;
+    }
+	
+	noise /= iterations;
+
+    return noise;
+}
 
 void main()
 {
     vec3 dir = w_eye - w_position;
     float dist = length(dir);
+    dir /= -dist;
 
-    vec3 lookup_pos = w_cloud;
-    lookup_pos.x += time*2f;
+    vec3 lookup_pos = w_position;
+    lookup_pos.x += time*speed;
 
-    float lookup_time = time*0.07f;
+    float lookup_time = time*0.01f;
 
-    float noise = 0.5f*snoise(vec4(lookup_pos*0.05f,lookup_time));
-    noise += snoise(vec4(lookup_pos*0.01f,lookup_time));
-    noise += 2*snoise(vec4(lookup_pos*0.005f,lookup_time));
+    float noise = 0;
+    float march_step = 2.0;
+    float max_distance = 10;
+    float max_depth = dir.y*max_distance;
 
-    //noise /= 3;
+    int marches = 0;
 
-    noise  = (noise+1)/2;
-    float fog_factor = 1-clamp((dist-150)/100,0,1);
+    float totaldist = 0;
+
+    while (totaldist < max_distance)
+    {
+        float m = mnoise(lookup_pos, lookup_time);
+
+        m *= (lookup_pos.y-w_position.y)/max_distance;
+
+        m = clamp ( m, 1-density, 1) - 1 + density;
+
+        noise += m;
+        
+        lookup_pos += dir*march_step;
+        marches++;
+        totaldist += march_step;
+    }
+
+    noise /= marches;
+
+    dir /= dist; // = normalize(dir);
+    float fog_factor = 1-clamp((dist-fog_start)/(fog_end-fog_start),0,1);
+
+    vec3 sky = samplesky(dir).xyz;
 
     vec3 l = normalize(sun);
 
-    float foo = pow(max(dot(l,-normalize(dir)),0),20);
+    float glow = pow(max(dot(l,-dir),0),20);
 
-    colour = vec4(vec3(noise+foo),noise*fog_factor*0.2f);
+    colour = vec4(mix(sky, vec3(1.0f), fog_factor),noise);
     //colour = vec4(vec3(noise+foo,0,noise+foo),fog_factor*0.5f);
 }
 

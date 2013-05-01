@@ -97,8 +97,16 @@ public class ColourMonkey
     float FAR = -100.0f;
     
     float water_level = -5.0f;
-    float cloud_level = 30.0f;
+    
+    float cloud_level = 20.0f;
+    float cloud_speed = 0.5f;
+    float cloud_scale = 1.0f;
+    float cloud_density = 0.7f;
+    
     float earth_radius = 100.0f;
+    
+    float fog_start = 150.0f;
+    float fog_end = 250.0f;
     
     Mat4 world, view, projection;
     Mat4 mirror_view;
@@ -216,6 +224,8 @@ public class ColourMonkey
         tShader.updateUniform(gl, "view", camera);
         tShader.updateUniform(gl, "projection", projection);
         tShader.updateUniform(gl, "sun", sun);
+        tShader.updateUniform(gl, "fog_start", fog_start);
+        tShader.updateUniform(gl, "fog_end", fog_end);
         tShader.updateUniform(gl, "clipPlane", clipPlane);
         tShader.updateUniform(gl, "clipWorld", clipWorld);
         
@@ -247,9 +257,15 @@ public class ColourMonkey
         cloudShader.updateUniform(gl, "projection", projection);
         cloudShader.updateUniform(gl, "time", time);
         cloudShader.updateUniform(gl, "sun", sun);
+        cloudShader.updateUniform(gl, "fog_start", fog_start);
+        cloudShader.updateUniform(gl, "fog_end", fog_end);
         
         cloudShader.updateUniform(gl, "radius", earth_radius);
+        
         cloudShader.updateUniform(gl, "cloud_height", cloud_level);
+        cloudShader.updateUniform(gl, "speed", cloud_speed);
+        cloudShader.updateUniform(gl, "density", cloud_density);
+        cloudShader.updateUniform(gl, "scale", cloud_scale);
         
         clouds.draw(gl);
         
@@ -269,6 +285,8 @@ public class ColourMonkey
         shiny.updateUniform(gl, "projection", projection);
         shiny.updateUniform(gl, "sun", sun);
         shiny.updateUniform(gl, "time", time);
+        shiny.updateUniform(gl, "fog_start", fog_start);
+        shiny.updateUniform(gl, "fog_end", fog_end);
         
         shiny.updateUniform(gl, "screenWidth", w_width);
         shiny.updateUniform(gl, "screenHeight", w_height);
@@ -317,7 +335,7 @@ public class ColourMonkey
         water = new Grid(gl, 512, 512, 20, 20, water_level);
         
         cloudShader = new Shader(gl, "clouds");
-        clouds = new Grid(gl, 2048, 2048, 256, 256, cloud_level, true);
+        clouds = new Grid(gl, 2048, 2048, 256, 256, 0, true);
         
         reflectBuffer = new FrameBuffer(gl, w_width, w_height);
         

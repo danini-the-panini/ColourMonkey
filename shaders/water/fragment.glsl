@@ -112,6 +112,9 @@ uniform float time;
 uniform int screenWidth;
 uniform int screenHeight;
 
+uniform float fog_start;
+uniform float fog_end;
+
 in vec3 g_normal;
 in vec3 g_tangent;
 in vec3 g_bitangent;
@@ -203,15 +206,21 @@ void main()
     vec3 reflection = texture(reflection, vec2(x+xoffset, 1-(y+yoffset))).xyz;
     vec3 environment = samplesky(ref).xyz;
 
-    float dist = length(w_eye - g_position);
-    float fog_factor = 1-clamp((dist-150)/100,0,1);
+
+    vec3 dir = w_eye - g_position;
+
+    float dist = length(dir);
+    dir /= dist; // = normalize(dir);
+    float fog_factor = 1-clamp((dist-fog_start)/(fog_end-fog_start),0,1);
+
+    vec3 sky = samplesky(dir).xyz;
 
     vec3 water_tint = vec3(0.3046875f, 0.609375f, 0.55078125f);
 
     float tint_amount = 0.5f;
     float water_opacity = 0.5f;
 
-    colour = vec4(mix(reflection,water_tint,tint_amount)+sun_colour,
-        water_opacity*fog_factor+length(sun_colour));
+    colour = vec4(mix(sky, mix(reflection,water_tint,tint_amount)+sun_colour, fog_factor),
+        water_opacity+length(sun_colour));
 }
 
