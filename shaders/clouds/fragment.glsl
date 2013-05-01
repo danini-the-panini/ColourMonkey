@@ -239,6 +239,5 @@ void main()
     vec4 grad = gradient(1.0-noise, glow);
 
     colour = vec4(mix (sky.xyz, vec3(grad.rgb), fog_factor), grad.a);
-    //colour = vec4(vec3(noise+foo,0,noise+foo),fog_factor*0.5f);
 }
 

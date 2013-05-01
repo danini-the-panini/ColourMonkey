@@ -39,12 +39,16 @@ public class ColourMonkey
     Mesh currentMesh;
     
     Shader sbShader;
-    SkyBox skybox;
+    SkyBox ndcQuad;
     
-    Shader shiny, cloudShader;
+    Shader waterShader, cloudShader;
     Grid water, clouds;
     
     FrameBuffer reflectBuffer;
+    FrameBuffer postBuffer;
+    
+    Shader postProcess;
+    int ssaa = 4; // amount of SSAA to apply;
     
     /*VoxelShader vShader;
     public static final int ci = 2, cj = 2, ck = 2;
@@ -100,7 +104,7 @@ public class ColourMonkey
     
     float cloud_level = 50.0f;
     float cloud_speed = 0.5f;
-    float cloud_density = 0.95f;
+    float cloud_density = 0.90f;
     
     float fog_start = 150.0f;
     float fog_end = 250.0f;
@@ -122,7 +126,7 @@ public class ColourMonkey
     
     void cleanUp(GL4 gl)
     {
-        // TODO: release meshes and shaders here
+        // TODO: release meshes and shaders here. EEEK!!!
     }
 
     void display(GL4 gl)
@@ -139,10 +143,12 @@ public class ColourMonkey
         float delta = nanos/(float)NANOS_PER_SECOND; 
         time += delta;
         
-        final float STEP = DELTA;
+        float step = DELTA;
         
-        Vec3 d = cameraAt.subtract(cameraEye).getUnitVector().multiply(STEP*delta);
-        Vec3 r = d.cross(cameraUp).getUnitVector().multiply(STEP*delta);
+        if (keys[KeyEvent.VK_SHIFT]) step *= 5;
+        
+        Vec3 d = cameraAt.subtract(cameraEye).getUnitVector().multiply(step*delta);
+        Vec3 r = d.cross(cameraUp).getUnitVector().multiply(step*delta);
 
         if (keys[KeyEvent.VK_W])
         {
@@ -173,19 +179,25 @@ public class ColourMonkey
     {
         reflectBuffer.use(gl);
         
-        gl.glEnable(GL4.GL_CLIP_DISTANCE0);
-        renderScene(gl, mirror_view);
-        gl.glDisable(GL4.GL_CLIP_DISTANCE0);
+            gl.glEnable(GL4.GL_CLIP_DISTANCE0);
+            renderScene(gl, mirror_view);
+            gl.glDisable(GL4.GL_CLIP_DISTANCE0);
         
+        postBuffer.use(gl);
+        
+            renderScene(gl, view);
+
+            reflectBuffer.bindTexture(gl, GL.GL_TEXTURE6);
+            renderWater(gl, view);
+            
         FrameBuffer.unbind(gl);
         
-        gl.glViewport(0, 0, w_width, w_height);
-        gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
-        
-        renderScene(gl, view);
-        
-        reflectBuffer.bindTexture(gl, GL.GL_TEXTURE6);
-        renderWater(gl, view);
+            gl.glViewport(0, 0, w_width, w_height);
+            gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
+
+            postBuffer.bindTexture(gl, GL.GL_TEXTURE7);
+
+            renderPostProcessing(gl);
 
         gl.glFlush();
     }
@@ -196,7 +208,17 @@ public class ColourMonkey
         renderTerrain(gl, camera);
         renderMesh(gl, camera);
         renderClouds(gl, camera, time);
-        gl.glDisable(GL.GL_BLEND);
+    }
+    
+    void renderPostProcessing(GL4 gl)
+    {
+        postProcess.use(gl);
+        
+        postProcess.updateUniform(gl, "screenWidth", w_width);
+        postProcess.updateUniform(gl, "screenHeight", w_height);
+        postProcess.updateUniform(gl, "ssaa", ssaa);
+        
+        ndcQuad.draw(gl);
     }
     
     void renderSkybox(GL4 gl, Mat4 camera)
@@ -208,13 +230,11 @@ public class ColourMonkey
         sbShader.updateUniform(gl, "aspect", aspect);
         sbShader.updateUniform(gl, "sun", sun);
         
-        skybox.draw(gl);
+        ndcQuad.draw(gl);
     }
     
     void renderTerrain(GL4 gl, Mat4 camera)
     {
-        gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
-        gl.glEnable(GL.GL_BLEND);
         tShader.use(gl);
         
         tShader.updateUniform(gl, "world", world);
@@ -227,7 +247,6 @@ public class ColourMonkey
         tShader.updateUniform(gl, "clipWorld", clipWorld);
         
         terrain.draw(gl);
-        gl.glDisable(GL.GL_BLEND);
     }
     
     void renderMesh(GL4 gl, Mat4 camera)
@@ -244,9 +263,10 @@ public class ColourMonkey
     
     void renderClouds(GL4 gl, Mat4 camera, float time)
     {
+        
+        
         gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
         gl.glEnable(GL.GL_BLEND);
-        //gl.glPolygonMode( GL.GL_FRONT_AND_BACK, GL4.GL_LINE );
         cloudShader.use(gl);
         
         cloudShader.updateUniform(gl, "world", world);
@@ -262,28 +282,27 @@ public class ColourMonkey
         cloudShader.updateUniform(gl, "density", cloud_density);
         
         clouds.draw(gl);
-        
         gl.glDisable(GL.GL_BLEND);
-       // gl.glPolygonMode( GL.GL_FRONT_AND_BACK, GL4.GL_FILL );
         
     }
     
     void renderWater(GL4 gl, Mat4 camera)
     {
+        
         gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
         gl.glEnable(GL.GL_BLEND);
-        shiny.use(gl);
+        waterShader.use(gl);
         
-        shiny.updateUniform(gl, "world", world);
-        shiny.updateUniform(gl, "view", camera);
-        shiny.updateUniform(gl, "projection", projection);
-        shiny.updateUniform(gl, "sun", sun);
-        shiny.updateUniform(gl, "time", time);
-        shiny.updateUniform(gl, "fog_start", fog_start);
-        shiny.updateUniform(gl, "fog_end", fog_end);
+        waterShader.updateUniform(gl, "world", world);
+        waterShader.updateUniform(gl, "view", camera);
+        waterShader.updateUniform(gl, "projection", projection);
+        waterShader.updateUniform(gl, "sun", sun);
+        waterShader.updateUniform(gl, "time", time);
+        waterShader.updateUniform(gl, "fog_start", fog_start);
+        waterShader.updateUniform(gl, "fog_end", fog_end);
         
-        shiny.updateUniform(gl, "screenWidth", w_width);
-        shiny.updateUniform(gl, "screenHeight", w_height);
+        waterShader.updateUniform(gl, "screenWidth", w_width*ssaa);
+        waterShader.updateUniform(gl, "screenHeight", w_height*ssaa);
         
         water.draw(gl);
         gl.glDisable(GL.GL_BLEND);
@@ -299,8 +318,11 @@ public class ColourMonkey
         //gl.glPolygonMode( GL.GL_FRONT_AND_BACK, GL4.GL_LINE );
         
         gl.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        
+        postBuffer = new FrameBuffer(gl, w_width*ssaa, w_height*ssaa);
+        postProcess = new Shader(gl, "postprocess");
 
-        skybox = new SkyBox(gl);
+        ndcQuad = new SkyBox(gl);
         
         File meshDir = new File("meshes");
         String[] meshNames = meshDir.list();
@@ -325,7 +347,7 @@ public class ColourMonkey
         shaderIndex = 0;
         currentShader = shaders.get(shaderIndex);
         
-        shiny = new Shader(gl, "water");
+        waterShader = new Shader(gl, "water");
         water = new Grid(gl, 512, 512, 20, 20, water_level);
         
         cloudShader = new Shader(gl, "clouds");

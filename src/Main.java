@@ -7,6 +7,7 @@ import javax.media.opengl.awt.GLCanvas;
 import javax.swing.JFrame;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.event.*;
 
 public class Main {
@@ -17,6 +18,7 @@ public class Main {
         final GLCapabilities glcapabilities = new GLCapabilities( glprofile );
         glcapabilities.setDoubleBuffered(true);
         final GLCanvas glcanvas = new GLCanvas( glcapabilities );
+        glcanvas.setPreferredSize(new Dimension(ColourMonkey.WINDOW_WIDTH, ColourMonkey.WINDOW_HEIGHT));
         
         final ColourMonkey app = new ColourMonkey();
 
@@ -28,6 +30,7 @@ public class Main {
                 System.exit( 0 );
             }
         });
+        jframe.setResizable(false);
         
         Animator animator = new Animator(glcanvas);
         
@@ -98,7 +101,8 @@ public class Main {
         });
 
         jframe.getContentPane().add( glcanvas, BorderLayout.CENTER );
-        jframe.setSize( 1280, 768 );
+        //jframe.setSize( 1280, 768 );
+        jframe.pack();
         jframe.setVisible( true );
         
         animator.start();

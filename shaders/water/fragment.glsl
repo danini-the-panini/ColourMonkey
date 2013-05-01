@@ -203,7 +203,7 @@ void main()
     vec3 ref = normalize(reflect(-v, normal));
     vec3 sun_colour = samplesun(ref).xyz;
 
-    float yoffset = 0;
+    float yoffset = -noise_scale;
     float xoffset = -(nsample*2-1)*noise_scale*2;
 
     vec3 reflection = texture(reflection, vec2(x+xoffset, 1-(y+yoffset))).xyz;
@@ -213,7 +213,7 @@ void main()
     vec3 dir = w_eye - g_position;
 
     float dist = length(dir);
-    dir /= dist; // = normalize(dir);
+    dir /= -dist; // = normalize(dir);
     float fog_factor = 1-clamp((dist-fog_start)/(fog_end-fog_start),0,1);
 
     vec3 sky = samplesky(dir).xyz;
