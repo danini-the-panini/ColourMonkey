@@ -137,7 +137,6 @@ uniform float fog_start;
 uniform float fog_end;
 uniform float speed;
 uniform float density;
-uniform float scale;
 
 in vec3 w_position;
 in vec3 w_eye;

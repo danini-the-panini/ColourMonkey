@@ -7,7 +7,6 @@ uniform mat4 projection;
 uniform mat4 world;
 uniform mat4 view;
 
-uniform float radius;
 uniform float cloud_height;
 
 out vec3 w_position;

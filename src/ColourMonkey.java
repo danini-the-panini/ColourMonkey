@@ -100,10 +100,7 @@ public class ColourMonkey
     
     float cloud_level = 20.0f;
     float cloud_speed = 0.5f;
-    float cloud_scale = 1.0f;
     float cloud_density = 0.7f;
-    
-    float earth_radius = 100.0f;
     
     float fog_start = 150.0f;
     float fog_end = 250.0f;
@@ -260,12 +257,9 @@ public class ColourMonkey
         cloudShader.updateUniform(gl, "fog_start", fog_start);
         cloudShader.updateUniform(gl, "fog_end", fog_end);
         
-        cloudShader.updateUniform(gl, "radius", earth_radius);
-        
         cloudShader.updateUniform(gl, "cloud_height", cloud_level);
         cloudShader.updateUniform(gl, "speed", cloud_speed);
         cloudShader.updateUniform(gl, "density", cloud_density);
-        cloudShader.updateUniform(gl, "scale", cloud_scale);
         
         clouds.draw(gl);
         
