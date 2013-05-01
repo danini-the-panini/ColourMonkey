@@ -1,5 +1,4 @@
 #version 420
-layout (location=0) uniform samplerCube cubeMap;
 
 in vec3 v_colour;
 in vec3 v_ndc;

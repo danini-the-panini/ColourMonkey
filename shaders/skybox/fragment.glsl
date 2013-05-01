@@ -1,5 +1,4 @@
 #version 420
-//layout (location=0) uniform samplerCube cubeMap;
 
 uniform vec3 sun;
 
