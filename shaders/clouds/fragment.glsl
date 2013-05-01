@@ -173,21 +173,48 @@ vec4 samplesky(vec3 dir)
 float mnoise(vec3 v, float t)
 {
 
-    float iterations = 3.0;
-    float nstep = 0.2;
+    v *= 0.01;
+
+    float iterations = 5.0;
+    float nstep = 2.0;
 
     float noise = 0.0;
-    float sscale = 0.5;
+    float sscale = 1.0;
 
     for (float i = 0.0; i < iterations; i+=1.0)
     {
-        noise += snoise(vec4(v*sscale,t))/sscale;
+        noise += clamp(snoise(vec4(v*sscale,t)),0,1)/sscale;
         sscale *= nstep;
     }
 	
-	noise /= iterations;
+    noise /= iterations;
 
     return noise;
+}
+
+const float FLUFFINESS = 0.05; // TODO: make this a uniform
+const float BLURRINESS = 0.02; // TODO: make this a uniform
+
+
+vec4 gradient(float v, float glow)
+{
+    float invglow = 1-glow;
+
+    if (v < density-BLURRINESS)
+    {
+        return mix(vec4(vec3(0.0),1.0),vec4(vec3(0.7+0.3*invglow),1.0), v/(density-BLURRINESS));
+    }
+    else if (v < density)
+    {
+        return mix(vec4(vec3(0.7+0.3*invglow),1.0), vec4(1.0,1.0,1.0,0.7), 
+                        clamp((v-density+BLURRINESS)/BLURRINESS,0.0,1.0));
+    }
+    else if (v < density+FLUFFINESS)
+    {
+        return mix(vec4(1.0,1.0,1.0,0.7),vec4(1.0,1.0,1.0,0.0),
+                        clamp((v-density)/FLUFFINESS,0.0,1.0));
+    }
+    return vec4(1.0,1.0,1.0,0.0);
 }
 
 void main()
@@ -197,46 +224,21 @@ void main()
     dir /= -dist;
 
     vec3 lookup_pos = w_position;
-    lookup_pos.x += time*speed;
+    lookup_pos.x += time*speed*0.01;
 
     float lookup_time = time*0.01f;
 
-    float noise = 0;
-    float march_step = 2.0;
-    float max_distance = 10;
-    float max_depth = dir.y*max_distance;
+    float noise = mnoise(lookup_pos, lookup_time);
 
-    int marches = 0;
-
-    float totaldist = 0;
-
-    while (totaldist < max_distance)
-    {
-        float m = mnoise(lookup_pos, lookup_time);
-
-        m *= (lookup_pos.y-w_position.y)/max_distance;
-
-        m = clamp ( m, 1-density, 1) - 1 + density;
-
-        noise += m;
-        
-        lookup_pos += dir*march_step;
-        marches++;
-        totaldist += march_step;
-    }
-
-    noise /= marches;
-
-    dir /= dist; // = normalize(dir);
     float fog_factor = 1-clamp((dist-fog_start)/(fog_end-fog_start),0,1);
 
-    vec3 sky = samplesky(dir).xyz;
-
+    vec4 sky = samplesky(dir);
     vec3 l = normalize(sun);
+    float glow = pow(max(dot(l,dir),0),10);
 
-    float glow = pow(max(dot(l,-dir),0),20);
+    vec4 grad = gradient(1.0-noise, glow);
 
-    colour = vec4(mix(sky, vec3(1.0f), fog_factor),noise);
+    colour = vec4(mix (sky.xyz, vec3(grad.rgb), fog_factor), grad.a);
     //colour = vec4(vec3(noise+foo,0,noise+foo),fog_factor*0.5f);
 }
 

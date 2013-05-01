@@ -181,7 +181,7 @@ void main()
     vec3 dir = w_eye - g_position;
 
     float dist = length(dir);
-    dir /= dist; // = normalize(dir);
+    dir /= -dist; // = normalize(dir);
     float fog_factor = 1-clamp((dist-fog_start)/(fog_end-fog_start),0,1);
 
     vec3 sky = samplesky(dir).xyz;

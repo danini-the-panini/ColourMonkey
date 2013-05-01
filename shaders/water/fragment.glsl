@@ -177,6 +177,10 @@ void main()
     float y = gl_FragCoord.y/float(screenHeight);
 
     vec3 normal = g_normal;
+
+    vec3 v = normalize(w_eye-g_position);
+
+    vec3 old_ref = normalize(reflect(-v, normal));
     
     float epsilon = 0.0001f;
 
@@ -193,7 +197,6 @@ void main()
     normal -= df;
 
 
-    vec3 v = normalize(w_eye-g_position);
     vec3 l = normalize(sun);
     vec3 r = normalize(reflect(-l,normal));
 

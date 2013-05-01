@@ -98,9 +98,9 @@ public class ColourMonkey
     
     float water_level = -5.0f;
     
-    float cloud_level = 20.0f;
+    float cloud_level = 50.0f;
     float cloud_speed = 0.5f;
-    float cloud_density = 0.7f;
+    float cloud_density = 0.95f;
     
     float fog_start = 150.0f;
     float fog_end = 250.0f;
