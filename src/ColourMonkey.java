@@ -133,7 +133,7 @@ public class ColourMonkey
     long lastUpdate;
     float time = 0.0f;
     
-    boolean shadowToggle = true;
+    boolean shadowToggle = true, ssaaToggle = false;
             
     public static final long NANOS_PER_SECOND = 1000000000l;
     
@@ -215,7 +215,17 @@ public class ColourMonkey
             renderScene(gl, mirror_view, true);
             gl.glDisable(GL4.GL_CLIP_DISTANCE0);
         
-        postBuffer.use(gl);
+        if (ssaaToggle)
+        {
+            postBuffer.use(gl);
+        }
+        else
+        {
+            FrameBuffer.unbind(gl);
+
+            gl.glViewport(0, 0, w_width, w_height);
+            gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
+        }
         
             shadowBuffer.bindDepthBuffer(gl, GL4.GL_TEXTURE8);
         
@@ -224,19 +234,22 @@ public class ColourMonkey
             reflectBuffer.bindTexture(gl, 0, GL.GL_TEXTURE6);
             renderWater(gl, view, projection);
             
-        FrameBuffer.unbind(gl);
-        
+        if (ssaaToggle)
+        {
+            FrameBuffer.unbind(gl);
+
             gl.glViewport(0, 0, w_width, w_height);
             gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
 
-            postBuffer.bindTexture(gl, 0, GL.GL_TEXTURE7);
+                postBuffer.bindTexture(gl, 0, GL.GL_TEXTURE7);
 
-            gl.glDisable(GL.GL_DEPTH_TEST);
-            renderPostProcessing(gl);
-            
-            shadowBuffer.bindDepthBuffer(gl, GL.GL_TEXTURE7);
-            renderShowoff(gl, w_width-110, w_height-110, 100, 100);
-            gl.glEnable(GL.GL_DEPTH_TEST);
+                gl.glDisable(GL.GL_DEPTH_TEST);
+                renderPostProcessing(gl);
+
+                shadowBuffer.bindDepthBuffer(gl, GL.GL_TEXTURE7);
+                renderShowoff(gl, w_width-110, w_height-110, 100, 100);
+                gl.glEnable(GL.GL_DEPTH_TEST);
+        }
 
         gl.glFlush();
     }
@@ -373,8 +386,8 @@ public class ColourMonkey
         waterShader.updateUniform(gl, "fog_start", fog_start);
         waterShader.updateUniform(gl, "fog_end", fog_end);
         
-        waterShader.updateUniform(gl, "screenWidth", w_width*ssaa);
-        waterShader.updateUniform(gl, "screenHeight", w_height*ssaa);
+        waterShader.updateUniform(gl, "screenWidth", w_width*(ssaaToggle?ssaa:1));
+        waterShader.updateUniform(gl, "screenHeight", w_height*(ssaaToggle?ssaa:1));
         
         water.draw(gl);
         gl.glDisable(GL.GL_BLEND);
@@ -503,6 +516,9 @@ public class ColourMonkey
                 break;
             case '1':
                 shadowToggle = !shadowToggle;
+                break;
+            case '`':
+                ssaaToggle = !ssaaToggle;
                 break;
             default:
                 break;
