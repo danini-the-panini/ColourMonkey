@@ -31,24 +31,23 @@ public class ColourMonkey
     int w_width = WINDOW_WIDTH, w_height = WINDOW_HEIGHT;
     float aspect;
     
-    ArrayList<Shader> shaders = new ArrayList<Shader>();
-    int shaderIndex;
-    Shader currentShader;
+    Shader shader;
     ArrayList<Mesh> meshes = new ArrayList<Mesh>();
     int meshIndex;
     Mesh currentMesh;
     
     Shader sbShader;
-    SkyBox ndcQuad;
+    NDCQuad ndcQuad;
     
     Shader waterShader, cloudShader;
     Grid water, clouds;
     
     FrameBuffer reflectBuffer;
     FrameBuffer postBuffer;
+    FrameBuffer shadowBuffer;
     
-    Shader postProcess;
-    int ssaa = 4; // amount of SSAA to apply;
+    Shader postProcess, showoff;
+    int ssaa = 2; // amount of SSAA to apply;
     
     /*VoxelShader vShader;
     public static final int ci = 2, cj = 2, ck = 2;
@@ -63,7 +62,7 @@ public class ColourMonkey
     static final float DELTA = 5f;
 
     /* Amount of rotation around the x axis. */
-    float xRot = 0.0f;
+    float xRot = -35.0f;
     /* Amount of rotation around the y axis. */
     float yRot = 0.0f;
     /* Amount of rotation around the z axis. */
@@ -73,18 +72,18 @@ public class ColourMonkey
     float camRotY = 0.0f;
 
     /* Amount to scale the x axis by. */
-    float xScale = 1.0f;
+    float xScale = 5.0f;
     /* Amount to scale the y axis by. */
-    float yScale = 1.0f;
+    float yScale = 5.0f;
     /* Amount to scale the z axis by. */
-    float zScale = 1.0f;
+    float zScale = 5.0f;
 
     /* Amount to move on the x axis. */
-    float xMove = 0.0f;
+    float xMove = -30.0f;
     /* Amount to move on the y axis. */
-    float yMove = 0.0f;
+    float yMove = -1.8f;
     /* Amount to move on the z axis. */
-    float zMove = 0.0f;
+    float zMove = 3.0f;
 
     /* Camera location. */
     Vec3 cameraEye = new Vec3(2f, 2f, 2f);
@@ -109,10 +108,22 @@ public class ColourMonkey
     float fog_start = 150.0f;
     float fog_end = 250.0f;
     
-    Mat4 world, view, projection;
-    Mat4 mirror_view;
+    Mat4 monkeyWorld;
+           
+    Mat4 view, projection, mirror_view;
     
-    Vec3 sun = new Vec3(-2.0f,1.5f,5.0f);
+    Mat4 lightView, lightProjection;
+    
+    Vec3 origin_sun = new Vec3(-2.0f,1.5f,5.0f);
+    Vec3 sun = new Vec3(origin_sun);
+    
+    float daytime = 0.0f;
+    
+    Vec3 lightEye = new Vec3(sun).multiply(10),
+            lightAt = new Vec3(0f, 0f, 0f),
+            lightUp = new Vec3(0f, 1f, 0f);
+    
+    int shadowRes = 8192;
     
     Vec4 clipPlane = new Vec4(0.0f, 1.0f, 0.0f, 0.0f);
     Mat4 clipWorld = Matrices.translate(new Mat4(1.0f), new Vec3(0.0f, -water_level, 0.0f));
@@ -121,6 +132,8 @@ public class ColourMonkey
     
     long lastUpdate;
     float time = 0.0f;
+    
+    boolean shadowToggle = true;
             
     public static final long NANOS_PER_SECOND = 1000000000l;
     
@@ -144,6 +157,9 @@ public class ColourMonkey
         time += delta;
         
         float step = DELTA;
+        
+        yRot += delta*50;
+        updateMonkeyWorld();
         
         if (keys[KeyEvent.VK_SHIFT]) step *= 5;
         
@@ -171,43 +187,74 @@ public class ColourMonkey
            cameraEye = cameraEye.subtract(r);
            cameraAt = cameraAt.subtract(r);
         }
+        else if (keys[KeyEvent.VK_2])
+        {
+            daytime += 1.0f;
+            updateSun();
+        }
+        else if (keys[KeyEvent.VK_3])
+        {
+            daytime -= 1.0f;
+            updateSun();
+        }
         
         updateView();
     }
     
     void render(GL4 gl)
     {
+        shadowBuffer.use(gl);
+        
+            gl.glCullFace(GL4.GL_FRONT);
+            renderScene(gl, lightView, lightProjection, false);
+            gl.glCullFace(GL4.GL_BACK);
+        
         reflectBuffer.use(gl);
         
             gl.glEnable(GL4.GL_CLIP_DISTANCE0);
-            renderScene(gl, mirror_view);
+            renderScene(gl, mirror_view, true);
             gl.glDisable(GL4.GL_CLIP_DISTANCE0);
         
         postBuffer.use(gl);
         
-            renderScene(gl, view);
+            shadowBuffer.bindDepthBuffer(gl, GL4.GL_TEXTURE8);
+        
+            renderScene(gl, true);
 
-            reflectBuffer.bindTexture(gl, GL.GL_TEXTURE6);
-            renderWater(gl, view);
+            reflectBuffer.bindTexture(gl, 0, GL.GL_TEXTURE6);
+            renderWater(gl, view, projection);
             
         FrameBuffer.unbind(gl);
         
             gl.glViewport(0, 0, w_width, w_height);
             gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
 
-            postBuffer.bindTexture(gl, GL.GL_TEXTURE7);
+            postBuffer.bindTexture(gl, 0, GL.GL_TEXTURE7);
 
+            gl.glDisable(GL.GL_DEPTH_TEST);
             renderPostProcessing(gl);
+            
+            shadowBuffer.bindDepthBuffer(gl, GL.GL_TEXTURE7);
+            renderShowoff(gl, w_width-110, w_height-110, 100, 100);
+            gl.glEnable(GL.GL_DEPTH_TEST);
 
         gl.glFlush();
     }
     
-    void renderScene(GL4 gl, Mat4 camera)
+    void renderScene(GL4 gl, boolean clouds)
     {
-        renderSkybox(gl, camera);
-        renderTerrain(gl, camera);
-        renderMesh(gl, camera);
-        renderClouds(gl, camera, time);
+        renderScene(gl, view, clouds);
+    }
+    void renderScene(GL4 gl, Mat4 camera, boolean clouds)
+    {
+        renderScene(gl, camera, projection, clouds);
+    }
+    void renderScene(GL4 gl, Mat4 camera, Mat4 proj, boolean clouds)
+    {
+        renderSkybox(gl, camera, proj);
+        renderTerrain(gl, camera, proj);
+        renderMesh(gl, camera, proj);
+        if (clouds) renderClouds(gl, camera, proj, time);
     }
     
     void renderPostProcessing(GL4 gl)
@@ -221,47 +268,72 @@ public class ColourMonkey
         ndcQuad.draw(gl);
     }
     
-    void renderSkybox(GL4 gl, Mat4 camera)
+    void renderShowoff(GL4 gl, int x, int y, int width, int height)
+    {
+        showoff.use(gl);
+    
+        gl.glViewport(x, y, width, height);
+        showoff.updateUniform(gl, "screenX", x);
+        showoff.updateUniform(gl, "screenY", y);
+        showoff.updateUniform(gl, "screenWidth", width);
+        showoff.updateUniform(gl, "screenHeight", height);
+        
+        ndcQuad.draw(gl);
+    }
+    
+    void renderSkybox(GL4 gl, Mat4 camera, Mat4 proj)
     {
         sbShader.use(gl);
         
-        sbShader.updateUniform(gl, "projection", projection);
         sbShader.updateUniform(gl, "view", camera);
+        sbShader.updateUniform(gl, "projection", proj);
         sbShader.updateUniform(gl, "aspect", aspect);
         sbShader.updateUniform(gl, "sun", sun);
         
         ndcQuad.draw(gl);
     }
     
-    void renderTerrain(GL4 gl, Mat4 camera)
+    void renderTerrain(GL4 gl, Mat4 camera, Mat4 proj)
     {
         tShader.use(gl);
         
-        tShader.updateUniform(gl, "world", world);
+        tShader.updateUniform(gl, "world", new Mat4(1.0f));
         tShader.updateUniform(gl, "view", camera);
-        tShader.updateUniform(gl, "projection", projection);
+        tShader.updateUniform(gl, "projection", proj);
+        
+        tShader.updateUniform(gl, "lview", lightView);
+        tShader.updateUniform(gl, "lprojection", lightProjection);
+        
         tShader.updateUniform(gl, "sun", sun);
+        tShader.updateUniform(gl, "shadowToggle", shadowToggle ? 1 : 0);
+        
         tShader.updateUniform(gl, "fog_start", fog_start);
         tShader.updateUniform(gl, "fog_end", fog_end);
+        
         tShader.updateUniform(gl, "clipPlane", clipPlane);
         tShader.updateUniform(gl, "clipWorld", clipWorld);
         
         terrain.draw(gl);
     }
     
-    void renderMesh(GL4 gl, Mat4 camera)
+    void renderMesh(GL4 gl, Mat4 camera, Mat4 proj)
     {
-        currentShader.use(gl);
+        shader.use(gl);
         
-        currentShader.updateUniform(gl, "world", world);
-        currentShader.updateUniform(gl, "view", camera);
-        currentShader.updateUniform(gl, "projection", projection);
-        currentShader.updateUniform(gl, "sun", sun);
+        shader.updateUniform(gl, "world", monkeyWorld);
+        shader.updateUniform(gl, "view", camera);
+        shader.updateUniform(gl, "projection", proj);
+        
+        shader.updateUniform(gl, "lview", lightView);
+        shader.updateUniform(gl, "lprojection", lightProjection);
+        
+        shader.updateUniform(gl, "sun", sun);
+        shader.updateUniform(gl, "shadowToggle", shadowToggle ? 1 : 0);
         
         currentMesh.draw(gl);
     }
     
-    void renderClouds(GL4 gl, Mat4 camera, float time)
+    void renderClouds(GL4 gl, Mat4 camera, Mat4 proj, float time)
     {
         
         
@@ -269,9 +341,9 @@ public class ColourMonkey
         gl.glEnable(GL.GL_BLEND);
         cloudShader.use(gl);
         
-        cloudShader.updateUniform(gl, "world", world);
+        cloudShader.updateUniform(gl, "world", new Mat4(1.0f));
         cloudShader.updateUniform(gl, "view", camera);
-        cloudShader.updateUniform(gl, "projection", projection);
+        cloudShader.updateUniform(gl, "projection", proj);
         cloudShader.updateUniform(gl, "time", time);
         cloudShader.updateUniform(gl, "sun", sun);
         cloudShader.updateUniform(gl, "fog_start", fog_start);
@@ -286,16 +358,16 @@ public class ColourMonkey
         
     }
     
-    void renderWater(GL4 gl, Mat4 camera)
+    void renderWater(GL4 gl, Mat4 camera, Mat4 proj)
     {
         
         gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
         gl.glEnable(GL.GL_BLEND);
         waterShader.use(gl);
         
-        waterShader.updateUniform(gl, "world", world);
+        waterShader.updateUniform(gl, "world", new Mat4(1.0f));
         waterShader.updateUniform(gl, "view", camera);
-        waterShader.updateUniform(gl, "projection", projection);
+        waterShader.updateUniform(gl, "projection", proj);
         waterShader.updateUniform(gl, "sun", sun);
         waterShader.updateUniform(gl, "time", time);
         waterShader.updateUniform(gl, "fog_start", fog_start);
@@ -319,10 +391,16 @@ public class ColourMonkey
         
         gl.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         
-        postBuffer = new FrameBuffer(gl, w_width*ssaa, w_height*ssaa);
+        lightProjection = Matrices.ortho(-300, 300, -50, 50, 10f, 250); // TODO: light projection
+        //lightProjection = Matrices.ortho(-90, 30, -30, 30, 10f, 250); // TODO: light projection
+        
+        shadowBuffer = new FrameBuffer(gl, shadowRes, shadowRes, 0, true);
+        
+        postBuffer = new FrameBuffer(gl, w_width*ssaa, w_height*ssaa, 1, false);
         postProcess = new Shader(gl, "postprocess");
+        showoff = new Shader(gl, "showoff");
 
-        ndcQuad = new SkyBox(gl);
+        ndcQuad = new NDCQuad(gl);
         
         File meshDir = new File("meshes");
         String[] meshNames = meshDir.list();
@@ -334,18 +412,7 @@ public class ColourMonkey
         meshIndex = 0;
         currentMesh = meshes.get(meshIndex);
         
-        File shaderDir = new File("shaders");
-        String[] shaderNames = shaderDir.list();
-        Arrays.sort(shaderNames);
-        for (int i = 0; i < shaderNames.length; i++)
-        {
-            if ("skybox".equals(shaderNames[i]) || "terrain".equals(shaderNames[i])
-                    || "voxels".equals(shaderNames[i]) || "water".equals(shaderNames[i]) )
-                continue;
-            shaders.add(new Shader(gl, shaderNames[i]));
-        }
-        shaderIndex = 0;
-        currentShader = shaders.get(shaderIndex);
+        shader = new Shader(gl, "monkey");
         
         waterShader = new Shader(gl, "water");
         water = new Grid(gl, 512, 512, 20, 20, water_level);
@@ -353,7 +420,7 @@ public class ColourMonkey
         cloudShader = new Shader(gl, "clouds");
         clouds = new Grid(gl, 2048, 2048, 256, 256, 0, true);
         
-        reflectBuffer = new FrameBuffer(gl, w_width, w_height);
+        reflectBuffer = new FrameBuffer(gl, w_width, w_height, 1, false);
         
         sbShader = new Shader(gl, "skybox");
         
@@ -408,7 +475,7 @@ public class ColourMonkey
 
         updateProjection(WINDOW_WIDTH, WINDOW_HEIGHT);
         updateView();
-        updateWorld();
+        updateMonkeyWorld();
         
         lastUpdate = System.nanoTime();
     }
@@ -421,15 +488,6 @@ public class ColourMonkey
 
         switch (key)
         {
-            case ',':
-                shaderIndex--;
-                if (shaderIndex < 0) shaderIndex = shaders.size()-1;
-                currentShader = shaders.get(shaderIndex);
-                break;
-            case '.':
-                shaderIndex = (shaderIndex+1)%shaders.size();
-                currentShader = shaders.get(shaderIndex);
-                break;
             case '[':
                 meshIndex--;
                 if (meshIndex < 0) meshIndex = meshes.size()-1;
@@ -442,6 +500,9 @@ public class ColourMonkey
             case KEY_ESCAPE:
                 System.out.printf("Bye!\n");
                 System.exit(0);
+                break;
+            case '1':
+                shadowToggle = !shadowToggle;
                 break;
             default:
                 break;
@@ -509,25 +570,51 @@ public class ColourMonkey
                 new Vec3(cameraEye.getX(),2*water_level-cameraEye.getY(),cameraEye.getZ()),
                 new Vec3(cameraAt.getX(),2*water_level-cameraAt.getY(),cameraAt.getZ()),
                 cameraUp);
+        
+        updateSunView();
     }
 
-    void updateWorld()
+    void updateMonkeyWorld()
     {
-        world = new Mat4(1f);
+        monkeyWorld = new Mat4(1f);
 
-        /*Vec3 translation = new Vec3(xMove, yMove, zMove);
-        world = Matrices.translate(world, translation);
-
-        Vec3 xAxis = new Vec3(1, 0, 0);
-        world = Matrices.rotate(world, xRot, xAxis);
+        Vec3 translation = new Vec3(xMove, yMove, zMove);
+        monkeyWorld = Matrices.translate(monkeyWorld, translation);
 
         Vec3 yAxis = new Vec3(0, 1, 0);
-        world = Matrices.rotate(world, yRot, yAxis);
+        monkeyWorld = Matrices.rotate(monkeyWorld, yRot, yAxis);
+        
+        Vec3 xAxis = new Vec3(1, 0, 0);
+        monkeyWorld = Matrices.rotate(monkeyWorld, xRot, xAxis);
 
         Vec3 zAxis = new Vec3(0, 0, 1);
-        world = Matrices.rotate(world, zRot, zAxis);
+        monkeyWorld = Matrices.rotate(monkeyWorld, zRot, zAxis);
 
         Vec3 scales = new Vec3(xScale, yScale, zScale);
-        world = Matrices.scale(world, scales);*/
+        monkeyWorld = Matrices.scale(monkeyWorld, scales);
+    }
+    
+    void updateSun()
+    {
+        Mat4 sunWorld = new Mat4(1.0f);
+        
+        sunWorld = Matrices.rotate(sunWorld, daytime, new Vec3(1,0.2f,0).getUnitVector());
+        
+        Vec4 sun4 = sunWorld.multiply(new Vec4(origin_sun, 0.0f));
+        
+        sun = new Vec3(sun4.getX(),sun4.getY(), sun4.getZ());
+        
+        updateSunView();
+    }
+    
+    void updateSunView()
+    {
+        //lightAt = new Vec3(cameraEye.getX(),0,cameraEye.getZ());
+        //lightEye = sun.getUnitVector().multiply(50).add(lightAt);
+        
+        lightEye = sun.multiply(10);
+        
+        lightView = Matrices.lookAt(
+                lightEye, lightAt, lightUp);
     }
 }

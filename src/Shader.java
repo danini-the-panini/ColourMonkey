@@ -3,6 +3,7 @@ import com.hackoeur.jglm.Mat4;
 import com.hackoeur.jglm.Vec3;
 import com.hackoeur.jglm.Vec4;
 import javax.media.opengl.GL4;
+import javax.media.opengl.GLUniformData;
 
 /*
  * To change this template, choose Tools | Templates

@@ -6,6 +6,8 @@ layout (binding=3) uniform sampler2D norm1;
 layout (binding=4) uniform sampler2D norm2;
 layout (binding=5) uniform sampler2D norm3;
 
+layout (binding=8) uniform sampler2D shadowMap;
+
 //
 // Description : Array and textureless GLSL 2D simplex noise function.
 //      Author : Ian McEwan, Ashima Arts.
@@ -81,6 +83,8 @@ float snoise(vec2 v)
 
 uniform vec3 sun;
 
+uniform int shadowToggle;
+
 uniform float fog_start;
 uniform float fog_end;
 
@@ -88,11 +92,13 @@ in vec3 g_normal;
 in vec3 g_position;
 in vec3 w_eye;
 
+in vec4 l_position;
+
 layout (location = 0) out vec4 colour;
 
 const vec3 skytop = vec3(0.08984375f, 0.27734375f, 0.41796875f);
-const vec3 skymid = vec3(0.40625f, 0.65234375f, 0.66796875f);
-const vec3 skybot = vec3(0.78125f, 0.87890625f, 0.83203125f);
+const vec3 skymid = vec3(0.40625f,    0.65234375f, 0.66796875f);
+const vec3 skybot = vec3(0.78125f,    0.87890625f, 0.83203125f);
 
 vec4 samplesky(vec3 dir)
 {
@@ -100,7 +106,7 @@ vec4 samplesky(vec3 dir)
 
     vec3 sun_colour;
 
-    sun_colour.r = pow(max(dot(-l,-dir),0),90.0f);
+    sun_colour.r = pow(max(dot(-l,-dir),0), 90.0f);
     sun_colour.g = pow(max(dot(-l,-dir),0),200.0f);
     sun_colour.b = pow(max(dot(-l,-dir),0),300.0f);
 
@@ -117,9 +123,17 @@ vec4 samplesky(vec3 dir)
     return vec4(clamp(sky+sun_colour,0,1),1.0f);
 }
 
+float shadowed(vec2 v, float dist)
+{
+    return texture(shadowMap, v).z < dist ? 1 : 0;
+}
+
 void main()
 {
+    // perspective division for the light position
+    vec4 ssLightPos = l_position / l_position.w;
 
+    // TRIPLANAR TEXTURE MAPPING AS DESCRIBED IN GPU GEMS 3, CHAPTER 1
 
     // Determine the blend weights for the 3 planar projections.  
     // N_orig is the vertex-interpolated normal vector.  
@@ -167,12 +181,14 @@ void main()
                            bump3.xyz * blend_weights.zzz;
     }  
     // Apply bump vector to vertex-interpolated normal vector.  
-    vec3 N_for_lighting =  normalize(g_normal + blended_bump_vec);  
+    vec3 N_for_lighting =  normalize(g_normal + blended_bump_vec); 
 
-    float ia = 0.1f;
-    float id = 0.6f;
-    float is = 0.3f;
-    float s = 50.0f;
+    // ... END OF TRIPLANAR MAPPING.
+
+    float ia = 0.2f;
+    float id = 0.7f;
+    float is = 0.1f;
+    float s = 10.0f;
 
     vec3 v = normalize(w_eye-g_position);
     vec3 l = normalize(sun);
@@ -186,8 +202,41 @@ void main()
 
     vec3 sky = samplesky(dir).xyz;
 
-    float ip = ia + max(dot(l,N_for_lighting),0)*id + pow(max(dot(r,v),0),s)*is;
+    float epsilon = 0.0002;
 
+    vec2[] offsets = vec2[](
+        vec2(0,1),vec2(0,-1),vec2(1,0),vec2(-1,0),
+        vec2(1,1),vec2(1,-1),vec2(-1,-1),vec2(-1,1)
+    );
+
+    float shadow = 1.0;
+    float ip = ia;
+
+    // only shadow if sun is above horizon
+    if (sun.y > 0)
+    {
+
+        ip = ia + max(dot(l,N_for_lighting),0)*id + pow(max(dot(r,v),0),s)*is;
+
+        shadow = shadowed(ssLightPos.xy, ssLightPos.z);
+
+        for (int i = 0; i < offsets.length(); i++)
+        {
+            shadow += shadowed(ssLightPos.xy + epsilon*offsets[i], ssLightPos.z);
+        }
+        for (int i = 0; i < offsets.length(); i++)
+        {
+            shadow += shadowed(ssLightPos.xy + 2*epsilon*offsets[i], ssLightPos.z);
+        }
+
+        shadow /= offsets.length()*2+1;
+
+        bool inShadow = shadowToggle == 1 && ssLightPos.x > 0 && ssLightPos.y > 0 && ssLightPos.x < 1 && ssLightPos.y < 1;
+
+        if (inShadow)
+            ip = mix (ip, ia, shadow);
+    }
+    
     colour = vec4(mix(sky, blended_color.xyz * ip, fog_factor), 1.0f);
 }
 
