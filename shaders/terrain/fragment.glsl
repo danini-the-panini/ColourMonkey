@@ -235,8 +235,14 @@ void main()
 
         if (inShadow)
             ip = mix (ip, ia, shadow);
+
+        // DEBUG MAGENTA
+        /*if (inShadow)
+            blended_color = mix (blended_color, vec4(1,0,1,1), 0.5);*/
+
+        blended_color.xyz *= ip;
     }
     
-    colour = vec4(mix(sky, blended_color.xyz * ip, fog_factor), 1.0f);
+    colour = vec4(mix(sky, blended_color.xyz, fog_factor), 1.0f);
 }
 

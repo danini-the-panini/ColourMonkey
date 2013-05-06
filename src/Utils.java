@@ -237,13 +237,12 @@ public class Utils {
         
     }
     
-    static void loadTexture(GL4 gl, ByteBuffer data, int width, int height, int slot)
+    static int loadTexture(GL4 gl, ByteBuffer data, int width, int height)
     {
-        gl.glActiveTexture(slot);
-        
         IntBuffer texName = Buffers.newDirectIntBuffer(1);
         gl.glGenTextures(1, texName);
-        gl.glBindTexture(GL.GL_TEXTURE_2D, texName.get());
+        int handle = texName.get();
+        gl.glBindTexture(GL.GL_TEXTURE_2D, handle);
 
         gl.glTexParameteri(
                 GL.GL_TEXTURE_2D,
@@ -269,6 +268,7 @@ public class Utils {
         
         gl.glGenerateMipmap(GL.GL_TEXTURE_2D);
 
+        return handle;
     }
     
     static void loadBuffer(GL4 gl, IntBuffer data, int size, int slot)

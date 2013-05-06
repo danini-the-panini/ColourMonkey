@@ -52,6 +52,12 @@ public class Terrain extends Mesh
     public Terrain(GL4 gl, float width, float length, float height,
             int xGrid, int yGrid, BufferedImage heightmap)
     {
+        this(gl, width, length, height, xGrid, yGrid, heightmap, false);
+    }
+    
+    public Terrain(GL4 gl, float width, float length, float height,
+            int xGrid, int yGrid, BufferedImage heightmap, boolean pointsOnly)
+    {
         super(gl);
         
         this.xGrid = xGrid;
@@ -64,7 +70,10 @@ public class Terrain extends Mesh
         final int NUM_QUADS = (xGrid-1)*(yGrid-1);
         final int NUM_VERTICES = xGrid*yGrid;
         
-        indexArraySize = NUM_QUADS * VERTICES_PER_QUAD;
+        if (pointsOnly)
+            indexArraySize = NUM_QUADS;
+        else
+            indexArraySize = NUM_QUADS * VERTICES_PER_QUAD;
         
         vertices = Buffers.newDirectFloatBuffer(NUM_VERTICES*DIMESIONS*2);
         
@@ -104,12 +113,15 @@ public class Terrain extends Mesh
             for (int j = 0; j < yGrid-1; j++)
             {
                 indices.put(i+j*xGrid);
-                indices.put(i+1+j*xGrid);
-                indices.put(i+1+(j+1)*xGrid);
-                
-                indices.put(i+j*xGrid);
-                indices.put(i+1+(j+1)*xGrid);
-                indices.put(i+(j+1)*xGrid);
+                if (!pointsOnly)
+                {
+                    indices.put(i+1+j*xGrid);
+                    indices.put(i+1+(j+1)*xGrid);
+
+                    indices.put(i+j*xGrid);
+                    indices.put(i+1+(j+1)*xGrid);
+                    indices.put(i+(j+1)*xGrid);
+                }
             }
         }
         

@@ -33,6 +33,13 @@ public abstract class Mesh
        gl.glDrawElements(GL.GL_TRIANGLES, indexArraySize, GL.GL_UNSIGNED_INT, 0);
     }
     
+    public void drawPoints(GL4 gl)
+    {
+       bind(gl);
+       
+       gl.glDrawElements(GL.GL_POINTS, indexArraySize, GL.GL_UNSIGNED_INT, 0);
+    }
+    
     public void drawPatches(GL4 gl) {
        bind(gl);
        

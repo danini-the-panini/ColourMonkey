@@ -49,12 +49,12 @@ public class ColourMonkey
     Shader postProcess, showoff;
     int ssaa = 2; // amount of SSAA to apply;
     
-    /*VoxelShader vShader;
-    public static final int ci = 2, cj = 2, ck = 2;
-    VoxelChunk[] chunks;*/
+    int[] terrainTextures = new int[6];
+    int[] grassTextures = new int[4];
     
-    Shader tShader;
+    Shader tShader, tpShader;
     Terrain terrain;
+    Terrain terrainPoints;
 
     /* Amount to rotate by in one step. */
     static final float ANGLE_DELTA = 60.0f;
@@ -213,6 +213,7 @@ public class ColourMonkey
         
             gl.glEnable(GL4.GL_CLIP_DISTANCE0);
             renderScene(gl, mirror_view, true);
+            renderGrass(gl, mirror_view, projection);
             gl.glDisable(GL4.GL_CLIP_DISTANCE0);
         
         if (ssaaToggle)
@@ -234,6 +235,8 @@ public class ColourMonkey
             reflectBuffer.bindTexture(gl, 0, GL.GL_TEXTURE6);
             renderWater(gl, view, projection);
             
+            renderGrass(gl, view, projection);
+            
         if (ssaaToggle)
         {
             FrameBuffer.unbind(gl);
@@ -254,20 +257,20 @@ public class ColourMonkey
         gl.glFlush();
     }
     
-    void renderScene(GL4 gl, boolean clouds)
+    void renderScene(GL4 gl, boolean full)
     {
-        renderScene(gl, view, clouds);
+        renderScene(gl, view, full);
     }
-    void renderScene(GL4 gl, Mat4 camera, boolean clouds)
+    void renderScene(GL4 gl, Mat4 camera, boolean full)
     {
-        renderScene(gl, camera, projection, clouds);
+        renderScene(gl, camera, projection, full);
     }
-    void renderScene(GL4 gl, Mat4 camera, Mat4 proj, boolean clouds)
+    void renderScene(GL4 gl, Mat4 camera, Mat4 proj, boolean full)
     {
         renderSkybox(gl, camera, proj);
         renderTerrain(gl, camera, proj);
         renderMesh(gl, camera, proj);
-        if (clouds) renderClouds(gl, camera, proj, time);
+        if (full) renderClouds(gl, camera, proj, time);
     }
     
     void renderPostProcessing(GL4 gl)
@@ -310,6 +313,12 @@ public class ColourMonkey
     {
         tShader.use(gl);
         
+        for (int i = 0; i < terrainTextures.length; i++)
+        {
+            gl.glActiveTexture(GL.GL_TEXTURE0+i);
+            gl.glBindTexture(GL.GL_TEXTURE_2D, terrainTextures[i]);
+        }
+        
         tShader.updateUniform(gl, "world", new Mat4(1.0f));
         tShader.updateUniform(gl, "view", camera);
         tShader.updateUniform(gl, "projection", proj);
@@ -327,6 +336,40 @@ public class ColourMonkey
         tShader.updateUniform(gl, "clipWorld", clipWorld);
         
         terrain.draw(gl);
+    }
+    
+    void renderGrass(GL4 gl, Mat4 camera, Mat4 proj)
+    {
+        gl.glEnable(GL.GL_BLEND);
+        gl.glDisable(GL.GL_CULL_FACE);
+        tpShader.use(gl);
+        
+        for (int i = 0; i < grassTextures.length; i++)
+        {
+            gl.glActiveTexture(GL.GL_TEXTURE0+i);
+            gl.glBindTexture(GL.GL_TEXTURE_2D, grassTextures[i]);
+        }
+        
+        tpShader.updateUniform(gl, "world", new Mat4(1.0f));
+        tpShader.updateUniform(gl, "view", camera);
+        tpShader.updateUniform(gl, "projection", proj);
+        
+        tpShader.updateUniform(gl, "lview", lightView);
+        tpShader.updateUniform(gl, "lprojection", lightProjection);
+        
+        tpShader.updateUniform(gl, "sun", sun);
+        tpShader.updateUniform(gl, "shadowToggle", shadowToggle ? 1 : 0);
+        
+        tpShader.updateUniform(gl, "fog_start", fog_start);
+        tpShader.updateUniform(gl, "fog_end", fog_end);
+        
+        tpShader.updateUniform(gl, "water_level", water_level);
+        
+        tpShader.updateUniform(gl, "time", time);
+        
+        terrainPoints.drawPoints(gl);
+        gl.glEnable(GL.GL_CULL_FACE);
+        gl.glDisable(GL.GL_BLEND);
     }
     
     void renderMesh(GL4 gl, Mat4 camera, Mat4 proj)
@@ -405,7 +448,6 @@ public class ColourMonkey
         gl.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         
         lightProjection = Matrices.ortho(-300, 300, -50, 50, 10f, 250); // TODO: light projection
-        //lightProjection = Matrices.ortho(-90, 30, -30, 30, 10f, 250); // TODO: light projection
         
         shadowBuffer = new FrameBuffer(gl, shadowRes, shadowRes, 0, true);
         
@@ -437,15 +479,8 @@ public class ColourMonkey
         
         sbShader = new Shader(gl, "skybox");
         
-        /*chunks = new VoxelChunk[ci*cj*ck];
-        for (int i = 0; i < chunks.length; i++)
-        {
-            chunks[i] = new VoxelChunk(gl, 32); // TODO: It's that blasted MAGIC NUMBER again!!??
-        }
-        
-        vShader = new VoxelShader(gl, "voxels");*/
-        
         tShader = new Shader(gl, "terrain");
+        tpShader = new Shader(gl, "grass");
         
         try
         {
@@ -456,6 +491,14 @@ public class ColourMonkey
                     50, // elevation
                     512,512, // grid resolution
                     heightmap);
+            
+            // for the grass... this is kinda "duplicate code" but whatever... :/
+            terrainPoints = new Terrain(gl,
+                    512, // width
+                    512, // length
+                    50, // elevation
+                    512,512, // grid resolution
+                    heightmap, true);
         } catch (IOException ex)
         {
             System.err.println("Could not load heightmap: " + ex.getMessage());
@@ -465,22 +508,34 @@ public class ColourMonkey
         {
             int w_h[] = new int[2];
             ByteBuffer data = Utils.loadTexture("textures/Stone1.jpg", w_h);
-            Utils.loadTexture(gl, data, w_h[0], w_h[1], GL.GL_TEXTURE0);
+            terrainTextures[0] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
             
             data = Utils.loadTexture("textures/Grass.jpg", w_h);
-            Utils.loadTexture(gl, data, w_h[0], w_h[1], GL.GL_TEXTURE1);
+            terrainTextures[1] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
             
             data = Utils.loadTexture("textures/Stone1.jpg", w_h);
-            Utils.loadTexture(gl, data, w_h[0], w_h[1], GL.GL_TEXTURE2);
+            terrainTextures[2] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
             
             data = Utils.loadTexture("textures/Stone1_N.jpg", w_h);
-            Utils.loadTexture(gl, data, w_h[0], w_h[1], GL.GL_TEXTURE3);
+            terrainTextures[3] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
             
             data = Utils.loadTexture("textures/Grass_N.jpg", w_h);
-            Utils.loadTexture(gl, data, w_h[0], w_h[1], GL.GL_TEXTURE4);
+            terrainTextures[4] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
             
             data = Utils.loadTexture("textures/Stone1_N.jpg", w_h);
-            Utils.loadTexture(gl, data, w_h[0], w_h[1], GL.GL_TEXTURE5);
+            terrainTextures[5] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
+            
+            data = Utils.loadTexture("textures/LongGrass_Colour.jpg", w_h);
+            grassTextures[0] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
+            
+            data = Utils.loadTexture("textures/LongGrass_Alpha.jpg", w_h);
+            grassTextures[1] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
+            
+            data = Utils.loadTexture("textures/noise2D.png", w_h);
+            grassTextures[2] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
+            
+            data = Utils.loadTexture("textures/noise.png", w_h);
+            grassTextures[3] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
         } catch (IOException ex)
         {
             System.err.println("Could not load texture: " + ex.getMessage());
