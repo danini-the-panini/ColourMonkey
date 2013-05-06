@@ -133,7 +133,7 @@ public class ColourMonkey
     long lastUpdate;
     float time = 0.0f;
     
-    boolean shadowToggle = true, ssaaToggle = false;
+    boolean shadowToggle = true, ssaaToggle = true;
             
     public static final long NANOS_PER_SECOND = 1000000000l;
     
