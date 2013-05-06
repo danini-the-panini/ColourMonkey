@@ -93,7 +93,7 @@ public class ColourMonkey
     Vec3 cameraUp = new Vec3(0f, 1f, 0f);
 
     /* Vertical field-of-view. */
-    float FOVY = 90.0f;
+    float FOVY = 60.0f;
     /* Near clipping plane. */
     float NEAR = 1.0f;
     /* Far clipping plane. */
@@ -101,7 +101,7 @@ public class ColourMonkey
     
     float water_level = -5.0f;
     
-    float cloud_level = 50.0f;
+    float cloud_level = 150.0f;
     float cloud_speed = 0.5f;
     float cloud_density = 0.90f;
     
@@ -359,8 +359,8 @@ public class ColourMonkey
         cloudShader.updateUniform(gl, "projection", proj);
         cloudShader.updateUniform(gl, "time", time);
         cloudShader.updateUniform(gl, "sun", sun);
-        cloudShader.updateUniform(gl, "fog_start", fog_start);
-        cloudShader.updateUniform(gl, "fog_end", fog_end);
+        cloudShader.updateUniform(gl, "fog_start", fog_start*2);
+        cloudShader.updateUniform(gl, "fog_end", fog_end*2);
         
         cloudShader.updateUniform(gl, "cloud_height", cloud_level);
         cloudShader.updateUniform(gl, "speed", cloud_speed);
