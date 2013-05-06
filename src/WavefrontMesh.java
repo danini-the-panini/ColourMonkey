@@ -70,9 +70,9 @@ public class WavefrontMesh extends Mesh
                     inds.add(Integer.valueOf(list[2].substring(0, list[2].indexOf("/"))) - 1);
                     inds.add(Integer.valueOf(list[3].substring(0, list[3].indexOf("/"))) - 1);
 
-                    ninds.add(Integer.valueOf(list[1].substring(list[1].indexOf("/") + 2)) - 1);
-                    ninds.add(Integer.valueOf(list[2].substring(list[2].indexOf("/") + 2)) - 1);
-                    ninds.add(Integer.valueOf(list[3].substring(list[3].indexOf("/") + 2)) - 1);
+                    ninds.add(Integer.valueOf(list[1].substring(list[1].lastIndexOf("/") + 1)) - 1);
+                    ninds.add(Integer.valueOf(list[2].substring(list[2].lastIndexOf("/") + 1)) - 1);
+                    ninds.add(Integer.valueOf(list[3].substring(list[3].lastIndexOf("/") + 1)) - 1);
                 }
             }
         } catch (IOException e)
