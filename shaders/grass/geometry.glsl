@@ -19,7 +19,7 @@ uniform float water_level;
 
 in vec3[] v_normal;
 
-out float ip;
+out float lightLevel;
 out vec3 g_position;
 out vec3 w_eye;
 out vec2 texCoord;
@@ -63,58 +63,18 @@ float shadowed(vec2 v, float dist)
     return texture(shadowMap, v).z < dist ? 1 : 0;
 }
 
-void makeQuad(vec3 pos, vec2 sideA, vec2 sideB, float height, float topOffset, float jitter)
-{
-    float yoffset = height*0.5;
+float ia = 0.2f;
+float id = 0.7f;
+float is = 0.1f;
+float s = 10.0f;
 
-    float offABit = (jitter*2-1)*0.005f;
-    float offAgain = -jitter;
-
-    sideA += vec2(offABit);
-    sideB += vec2(offAgain);
-
-    gl_Position = projection * view * world * vec4(pos+vec3(sideA.x,-yoffset,sideA.y) ,1.0f);
-    texCoord = vec2(0,1);
-    EmitVertex();
-    gl_Position = projection * view * world * vec4(pos+vec3(sideA.x+topOffset,yoffset+height,sideA.y) ,1.0f);
-    texCoord = vec2(0,0);
-    EmitVertex();
-    gl_Position = projection * view * world * vec4(pos+vec3(sideB.x+topOffset,yoffset+height,sideB.y) ,1.0f);
-    texCoord = vec2(1,0);
-    EmitVertex();
-    EndPrimitive();
-
-    gl_Position = projection * view * world * vec4(pos+vec3(sideB.x+topOffset,yoffset+height,sideB.y) ,1.0f);
-    texCoord = vec2(1,0);
-    EmitVertex();
-    gl_Position = projection * view * world * vec4(pos+vec3(sideB.x,-yoffset,sideB.y) ,1.0f);
-    texCoord = vec2(1,1);
-    EmitVertex();
-    gl_Position = projection * view * world * vec4(pos+vec3(sideA.x,-yoffset,sideA.y) ,1.0f);
-    texCoord = vec2(0,1);
-    EmitVertex();
-    EndPrimitive();
-}
-
-void foo(vec3 pos)
+float getIP(vec3 pos, vec3 norm, float random)
 {
     vec4 ssLightPos = bias * lprojection * lview * world * vec4(pos,1.0f);
 
-    g_position = (world * vec4(pos,1.0f)).xyz;
-
-    float random = texture(noiseMap2, g_position.xz*0.05f)*2-1;
-
-    float height = 0.45f + (texture(noiseMap, g_position.xz*0.2f)*2-1)*0.7f;
-    float topOffset = sin(time)*0.1f;
-
-    float ia = 0.2f;
-    float id = 0.7f;
-    float is = 0.1f;
-    float s = 10.0f;
-
-    vec3 v = normalize(w_eye-g_position);
+    vec3 v = normalize(w_eye-pos);
     vec3 l = normalize(sun);
-    vec3 r = normalize(reflect(-l,v_normal[0]));
+    vec3 r = normalize(reflect(-l,norm));
 
     float epsilon = 0.0002f;
 
@@ -124,13 +84,13 @@ void foo(vec3 pos)
     );
 
     float shadow = 1.0;
-    ip = ia;
+    float ip = ia;
 
     // only shadow if sun is above horizon
     if (sun.y > 0)
     {
 
-        ip = ia + max(dot(l,v_normal[0]),0)*id + pow(max(dot(r,v),0),s)*is;
+        ip = ia + max(dot(l,norm),0)*id + pow(max(dot(r,v),0),s)*is;
 
         shadow = shadowed(ssLightPos.xy, ssLightPos.z);
 
@@ -151,8 +111,61 @@ void foo(vec3 pos)
             ip = mix (ip, ia, shadow);
     }
 
-    ip *= 1.0f - random*0.1f;
+    return ip * ( 1.0f - random*0.1f );
+}
 
+void makeQuad(vec3 pos, vec2 sideA, vec2 sideB, float height, float topOffset, float jitter)
+{
+    float yoffset = height*0.5;
+
+    float offABit = (jitter*2-1)*0.005f;
+    float offAgain = -jitter;
+
+    sideA += vec2(offABit);
+    sideB += vec2(offAgain);
+
+    vec3 point;
+
+    lightLevel = getIP(pos,v_normal[0], jitter);
+
+    point = pos+vec3(sideA.x,-yoffset,sideA.y);
+    gl_Position = projection * view * world * vec4(point ,1.0f);
+    texCoord = vec2(0,1);
+    EmitVertex();
+    point = pos+vec3(sideA.x+topOffset,yoffset+height,sideA.y);
+    gl_Position = projection * view * world * vec4(point ,1.0f);
+    texCoord = vec2(0,0);
+    EmitVertex();
+    point = pos+vec3(sideB.x+topOffset,yoffset+height,sideB.y);
+    gl_Position = projection * view * world * vec4(point ,1.0f);
+    texCoord = vec2(1,0);
+    EmitVertex();
+    EndPrimitive();
+
+    point = pos+vec3(sideB.x+topOffset,yoffset+height,sideB.y);
+    gl_Position = projection * view * world * vec4(point ,1.0f);
+    texCoord = vec2(1,0);
+    EmitVertex();
+    point = pos+vec3(sideB.x,-yoffset,sideB.y);
+    gl_Position = projection * view * world * vec4(point ,1.0f);
+    texCoord = vec2(1,1);
+    EmitVertex();
+    point = pos+vec3(sideA.x,-yoffset,sideA.y);
+    gl_Position = projection * view * world * vec4(point ,1.0f);
+    texCoord = vec2(0,1);
+    EmitVertex();
+    EndPrimitive();
+}
+
+void foo(vec3 pos)
+{
+
+    g_position = (world * vec4(pos,1.0f)).xyz;
+
+    float random = texture(noiseMap2, g_position.xz*0.05f)*2-1;
+
+    float height = 0.45f + (texture(noiseMap, g_position.xz*0.2f)*2-1)*1f;
+    float topOffset = sin(time)*0.1f;
 
     if (random < 0.333f)
     {
@@ -179,7 +192,6 @@ void foo(vec3 pos)
 
 void main()
 {
-
     if (v_normal[0].y < 0.95f) return; // no grass on cliffs
 
     w_eye = (inverse(view) * vec4 (0, 0, 1, 1)).xyz;

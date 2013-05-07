@@ -13,7 +13,7 @@ uniform vec3 sun;
 
 in vec3 w_eye;
 in vec3 g_position;
-in float ip;
+in float lightLevel;
 in vec2 texCoord;
 
 const vec3 skytop = vec3(0.08984375f, 0.27734375f, 0.41796875f);
@@ -59,6 +59,6 @@ void main()
     if (alpha < 0.5f)
         discard;
 
-    colour = vec4(mix(sky, texture(grassColour,texCoord).rgb*ip, fog_factor), 1.0f);
+    colour = vec4(mix(sky, texture(grassColour,texCoord).rgb*lightLevel, fog_factor), 1.0f);
 }
 
