@@ -105,6 +105,8 @@ float snoise(vec3 v)
 
 // END OF SOMEONE'S NOISE FUNCTION I GIT FROM THE INTERTUBES
 
+layout (binding = 0) uniform sampler2D fnoise;
+
 uniform vec3 sun;
 uniform float time;
 uniform float fog_start;
@@ -197,12 +199,13 @@ void main()
     float dist = length(dir);
     dir /= -dist;
 
-    vec2 lookup_pos = w_position.xz;
-    lookup_pos.x += time*speed*0.01;
+    vec2 lookup_pos = w_position.xz*0.002;
+    lookup_pos.x += time*speed*0.001;
 
-    float lookup_time = time*0.01f;
+    float lookup_time = time*0.02f;
 
-    float noise = mnoise(lookup_pos, lookup_time);
+//    float noise = mnoise(lookup_pos, lookup_time);
+    float noise = texture(fnoise, lookup_pos);
 
     float fog_factor = 1-clamp((dist-fog_start)/(fog_end-fog_start),0,1);
 

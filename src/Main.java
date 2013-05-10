@@ -12,6 +12,8 @@ import java.awt.event.*;
 
 public class Main {
    
+
+   public static JFrame jframe = new JFrame( "Colour Monkey!" ); 
     
     public static void main( String [] args ) {
         final GLProfile glprofile = GLProfile.getDefault();
@@ -22,7 +24,6 @@ public class Main {
         
         final ColourMonkey app = new ColourMonkey();
 
-        final JFrame jframe = new JFrame( "Colour Monkey!" ); 
         jframe.addWindowListener( new WindowAdapter() {
             @Override
             public void windowClosing( WindowEvent windowevent ) {

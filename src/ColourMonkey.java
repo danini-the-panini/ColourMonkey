@@ -51,6 +51,7 @@ public class ColourMonkey
     
     int[] terrainTextures = new int[6];
     int[] grassTextures = new int[4];
+    int cloudTexture;
     
     Shader tShader, tpShader;
     Terrain terrain;
@@ -103,7 +104,7 @@ public class ColourMonkey
     
     float cloud_level = 150.0f;
     float cloud_speed = 0.5f;
-    float cloud_density = 0.90f;
+    float cloud_density = 0.50f;
     
     float fog_start = 150.0f;
     float fog_end = 250.0f;
@@ -155,6 +156,8 @@ public class ColourMonkey
         lastUpdate = nTime;
         float delta = nanos/(float)NANOS_PER_SECOND; 
         time += delta;
+
+	Main.jframe.setTitle(String.format("Colour Monkey! FPS: %.2f",1.0f/delta));
         
         float step = DELTA;
         
@@ -203,7 +206,7 @@ public class ColourMonkey
     
     void render(GL4 gl)
     {
-        shadowBuffer.use(gl);
+        /*shadowBuffer.use(gl);
         
             gl.glCullFace(GL4.GL_FRONT);
             renderScene(gl, lightView, lightProjection, false);
@@ -214,7 +217,7 @@ public class ColourMonkey
             gl.glEnable(GL4.GL_CLIP_DISTANCE0);
             renderScene(gl, mirror_view, true);
             renderGrass(gl, mirror_view, projection);
-            gl.glDisable(GL4.GL_CLIP_DISTANCE0);
+            gl.glDisable(GL4.GL_CLIP_DISTANCE0);*/
         
         if (ssaaToggle)
         {
@@ -233,9 +236,9 @@ public class ColourMonkey
             renderScene(gl, true);
 
             reflectBuffer.bindTexture(gl, 0, GL.GL_TEXTURE6);
-            renderWater(gl, view, projection);
+        //    renderWater(gl, view, projection);
             
-            renderGrass(gl, view, projection);
+        //    renderGrass(gl, view, projection);
             
         if (ssaaToggle)
         {
@@ -267,10 +270,10 @@ public class ColourMonkey
     }
     void renderScene(GL4 gl, Mat4 camera, Mat4 proj, boolean full)
     {
-        renderSkybox(gl, camera, proj);
+//        renderSkybox(gl, camera, proj);
         renderTerrain(gl, camera, proj);
-        renderMesh(gl, camera, proj);
-        if (full) renderClouds(gl, camera, proj, time);
+        //renderMesh(gl, camera, proj);
+//        if (full) renderClouds(gl, camera, proj, time);
     }
     
     void renderPostProcessing(GL4 gl)
@@ -391,7 +394,8 @@ public class ColourMonkey
     
     void renderClouds(GL4 gl, Mat4 camera, Mat4 proj, float time)
     {
-        
+        gl.glActiveTexture(GL.GL_TEXTURE0);
+        gl.glBindTexture(GL.GL_TEXTURE_2D, cloudTexture);
         
         gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
         gl.glEnable(GL.GL_BLEND);
@@ -536,6 +540,10 @@ public class ColourMonkey
             
             data = Utils.loadTexture("textures/noise.png", w_h);
             grassTextures[3] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
+
+	    data = Utils.loadTexture("textures/fnoise.jpg", w_h);
+            cloudTexture = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
+
         } catch (IOException ex)
         {
             System.err.println("Could not load texture: " + ex.getMessage());

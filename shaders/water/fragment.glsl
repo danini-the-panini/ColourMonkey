@@ -196,7 +196,6 @@ void main()
 
     normal -= df;
 
-
     vec3 l = normalize(sun);
     vec3 r = normalize(reflect(-l,normal));
 

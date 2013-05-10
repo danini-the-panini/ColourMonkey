@@ -194,7 +194,7 @@ void main()
 {
     if (v_normal[0].y < 0.95f) return; // no grass on cliffs
 
-    w_eye = (inverse(view) * vec4 (0, 0, 1, 1)).xyz;
+    w_eye = (inverse(view) * vec4 (0, 0, 0, 1)).xyz;
 
     vec3 g_pos = gl_in[0].gl_Position.xyz;
 
@@ -204,7 +204,15 @@ void main()
 
     if (dot(v_normal[0],v) < 0.0) return; // no grass on back-facing terrain
 
-    float dist = distance(w_eye,(world * vec4(g_pos,1.0f)).xyz);
+    vec3 w_pos = (world * vec4(g_pos,1.0f)).xyz;
+
+
+    float dist = distance(w_eye, w_pos);
+
+    vec4 ndc_pos = projection * view * world * vec4(g_pos,1.0f);
+    ndc_pos = abs(ndc_pos/ndc_pos.w);
+
+    if (ndc_pos.x > 1 || ndc_pos.y > 1 || ndc_pos.z > 1) return;
 
     if (dist > 70) return; // skip distant grass (or at least make it less dense?)
 
