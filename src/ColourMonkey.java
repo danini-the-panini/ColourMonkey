@@ -453,11 +453,14 @@ public class ColourMonkey
         
         lightProjection = Matrices.ortho(-300, 300, -50, 50, 10f, 250); // TODO: light projection
         
-        shadowBuffer = new FrameBuffer(gl, shadowRes, shadowRes, 0, true);
+        shadowBuffer = new FrameBuffer(gl, shadowRes, shadowRes, null, true);
         
-        postBuffer = new FrameBuffer(gl, w_width*ssaa, w_height*ssaa, 1, false);
+        postBuffer = new FrameBuffer(gl, w_width*ssaa, w_height*ssaa,
+                new int[]{GL4.GL_TEXTURE_2D}, false);
         postProcess = new Shader(gl, "postprocess");
         showoff = new Shader(gl, "showoff");
+        
+        // TODO: skymapBuffer = new FrameBuffer(gl, 1024, 1024, new int[]{ GL4.GL_TEXTURE_CUBE_MAP }, false);
 
         ndcQuad = new NDCQuad(gl);
         
@@ -479,7 +482,8 @@ public class ColourMonkey
         cloudShader = new Shader(gl, "clouds");
         clouds = new Grid(gl, 2048, 2048, 256, 256, 0, true);
         
-        reflectBuffer = new FrameBuffer(gl, w_width, w_height, 1, false);
+        reflectBuffer = new FrameBuffer(gl, w_width, w_height,
+                new int[]{ GL4.GL_TEXTURE_2D }, false);
         
         sbShader = new Shader(gl, "skybox");
         

@@ -11,7 +11,9 @@ public class FrameBuffer
     private boolean hasDepth;
     private int depthTextureHandle;
     
-    public FrameBuffer(GL4 gl, int width, int height, int numColourBuffs, boolean depthUseTexture)
+    private int nextAttachment = 0;
+    
+    public FrameBuffer(GL4 gl, int width, int height, int[] colourBuffs, boolean depthUseTexture)
     {
         this.hasDepth = depthUseTexture;
         
@@ -24,33 +26,22 @@ public class FrameBuffer
         System.out.println("FBO handle: " + handle);
         bind(gl);
         
-        renderedTextureHandle = new int[numColourBuffs];
+        renderedTextureHandle = new int[colourBuffs.length];
         
-        for (int i = 0; i < numColourBuffs; i++)
-        {
-            // The texture we're going to render to
-            IntBuffer renderedTexture = Buffers.newDirectIntBuffer(1);
-            gl.glGenTextures(1, renderedTexture);
-            renderedTextureHandle[i] = renderedTexture.get();
-
-            // "Bind" the newly created texture : all future texture functions will modify this texture
-            gl.glBindTexture(GL4.GL_TEXTURE_2D, renderedTextureHandle[i]);
-
-            // Give an empty image to OpenGL ( the last "0" )
-            gl.glTexImage2D(GL4.GL_TEXTURE_2D, 0, GL4.GL_RGBA, width, height, 0, GL4.GL_RGBA, GL4.GL_UNSIGNED_BYTE, null);
-
-            // Poor filtering. Needed !
-            gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MAG_FILTER, GL4.GL_LINEAR);
-            gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MIN_FILTER, GL4.GL_LINEAR);
-            gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_R, GL4.GL_CLAMP_TO_EDGE);
-            gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_S, GL4.GL_CLAMP_TO_EDGE);
-            gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_T, GL4.GL_CLAMP_TO_EDGE);
-
-
-            // Set "renderedTexture" as our colour attachement #0
-            gl.glFramebufferTexture(GL4.GL_FRAMEBUFFER, GL4.GL_COLOR_ATTACHMENT0+i, renderedTextureHandle[i], 0);
-        }
-        
+        if (colourBuffs != null)
+            for (int i = 0; i < colourBuffs.length; i++)
+            {
+                switch (colourBuffs[i])
+                {
+                    case GL4.GL_TEXTURE_2D:
+                        createTexture(gl, i); break;
+                    case GL4.GL_TEXTURE_CUBE_MAP:
+                        createCubeTexture(gl, i); break;
+                    default:
+                        System.out.println("Unrecognised texture type: " + colourBuffs[i]);
+                        break; // DO NOTHING :)
+                }
+            }
         
         // depth buffer
         
@@ -102,6 +93,65 @@ public class FrameBuffer
         
         unbind(gl);
 
+    }
+    
+    protected final void createTexture(GL4 gl, int i)
+    {
+        // The texture we're going to render to
+        IntBuffer renderedTexture = Buffers.newDirectIntBuffer(1);
+        gl.glGenTextures(1, renderedTexture);
+        renderedTextureHandle[i] = renderedTexture.get();
+
+        // "Bind" the newly created texture : all future texture functions will modify this texture
+        gl.glBindTexture(GL4.GL_TEXTURE_2D, renderedTextureHandle[i]);
+
+        // Give an empty image to OpenGL ( the last "0" )
+        gl.glTexImage2D(GL4.GL_TEXTURE_2D, 0, GL4.GL_RGBA, width, height, 0, GL4.GL_RGBA, GL4.GL_UNSIGNED_BYTE, null);
+
+        // Poor filtering. Needed !
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MAG_FILTER, GL4.GL_LINEAR);
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MIN_FILTER, GL4.GL_LINEAR);
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_R, GL4.GL_CLAMP_TO_EDGE);
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_S, GL4.GL_CLAMP_TO_EDGE);
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_T, GL4.GL_CLAMP_TO_EDGE);
+
+
+        // Set "renderedTexture" as our colour attachement #0
+        gl.glFramebufferTexture(GL4.GL_FRAMEBUFFER, GL4.GL_COLOR_ATTACHMENT0+i, renderedTextureHandle[i], 0);
+    } 
+    
+    protected final void createCubeTexture(GL4 gl, int i)
+    {
+        // The texture we're going to render to
+        IntBuffer renderedTexture = Buffers.newDirectIntBuffer(1);
+        gl.glGenTextures(1, renderedTexture);
+        renderedTextureHandle[i] = renderedTexture.get();
+
+        // "Bind" the newly created texture : all future texture functions will modify this texture
+        gl.glBindTexture(GL4.GL_TEXTURE_CUBE_MAP, renderedTextureHandle[i]);
+
+        // Give an empty image to OpenGL ( the last "0" )
+        for (int face = 0; face < 6; i++)
+        {
+            gl.glTexImage2D(GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+face, 0, GL4.GL_RGBA, width, height, 0, GL4.GL_RGBA, GL4.GL_UNSIGNED_BYTE, null);
+        }
+
+        // Poor filtering. Needed !
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MAG_FILTER, GL4.GL_LINEAR);
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MIN_FILTER, GL4.GL_LINEAR);
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_R, GL4.GL_CLAMP_TO_EDGE);
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_S, GL4.GL_CLAMP_TO_EDGE);
+        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_T, GL4.GL_CLAMP_TO_EDGE);
+
+
+        // Set "renderedTexture" as our colour attachement #0
+        for (int face = 0; face < 6; face++)
+        {
+            gl.glFramebufferTexture2D(GL4.GL_FRAMEBUFFER,
+                    GL4.GL_COLOR_ATTACHMENT0+(nextAttachment++),
+                    GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+face,
+                    renderedTextureHandle[i], 0);
+        }
     }
     
     public final void bind(GL4 gl)
