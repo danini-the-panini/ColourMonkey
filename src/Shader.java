@@ -26,6 +26,8 @@ public class Shader
     
     public Shader(GL4 gl, String name)
     {
+        System.out.println("Loading shader " + name);
+        
         vertexShader = Utils.loadShaderProgram(gl, "shaders/"+name+"/vertex.glsl", GL4.GL_VERTEX_SHADER);
         geometryShader = Utils.loadShaderProgram(gl, "shaders/"+name+"/geometry.glsl", GL4.GL_GEOMETRY_SHADER);
         tessContShader = Utils.loadShaderProgram(gl, "shaders/"+name+"/tesselation_control.glsl", GL4.GL_TESS_CONTROL_SHADER);

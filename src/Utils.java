@@ -1,4 +1,7 @@
 
+import com.hackoeur.jglm.Mat4;
+import com.hackoeur.jglm.Matrices;
+import com.hackoeur.jglm.Vec3;
 import com.jogamp.common.nio.Buffers;
 import java.awt.AlphaComposite;
 import java.awt.Color;
@@ -309,5 +312,45 @@ public class Utils {
         gl.glTexBuffer(GL4.GL_TEXTURE_BUFFER, GL4.GL_RGB32I, bufferHandle);
         System.out.println("Error? " + gl.glGetError());
 
+    }
+    
+    public static Mat4 lookAtCube(Vec3 eye, int face)
+    {
+        final Vec3 X = new Vec3(1,0,0);
+        final Vec3 Y = new Vec3(0,1,0);
+        final Vec3 Z = new Vec3(0,0,1);
+        
+        Vec3 at;
+        Vec3 up;
+        switch (face)
+        {
+            case GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+                up = Y.getNegated();
+                at = eye.add(X);
+                break;
+            case GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+                up = Z;
+                at = eye.add(Y);
+                break;
+            case GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+                up = Y.getNegated();
+                at = eye.add(Z);
+                break;
+            case GL4.GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+                up = Y.getNegated();
+                at = eye.add(X.getNegated());
+                break;
+            case GL4.GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+                up = Z.getNegated();
+                at = eye.add(Y.getNegated());
+                break;
+            case GL4.GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+                up = Y.getNegated();
+                at = eye.add(Z.getNegated());
+                break;
+            default:
+                return null;
+        }
+        return Matrices.lookAt(eye, at, up);
     }
 }

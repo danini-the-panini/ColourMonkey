@@ -1,19 +1,21 @@
 
 import com.jogamp.common.nio.Buffers;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import javax.imageio.ImageIO;
 import javax.media.opengl.GL4;
 
 public class FrameBuffer
 {
     private int handle;
     private int width, height;
-    private int[] renderedTextureHandle;
     private boolean hasDepth;
     private int depthTextureHandle;
     
-    private int nextAttachment = 0;
-    
-    public FrameBuffer(GL4 gl, int width, int height, int[] colourBuffs, boolean depthUseTexture)
+    public FrameBuffer(GL4 gl, int width, int height, boolean depthUseTexture)
     {
         this.hasDepth = depthUseTexture;
         
@@ -25,23 +27,6 @@ public class FrameBuffer
         handle = handleBuf.get();
         System.out.println("FBO handle: " + handle);
         bind(gl);
-        
-        renderedTextureHandle = new int[colourBuffs.length];
-        
-        if (colourBuffs != null)
-            for (int i = 0; i < colourBuffs.length; i++)
-            {
-                switch (colourBuffs[i])
-                {
-                    case GL4.GL_TEXTURE_2D:
-                        createTexture(gl, i); break;
-                    case GL4.GL_TEXTURE_CUBE_MAP:
-                        createCubeTexture(gl, i); break;
-                    default:
-                        System.out.println("Unrecognised texture type: " + colourBuffs[i]);
-                        break; // DO NOTHING :)
-                }
-            }
         
         // depth buffer
         
@@ -66,7 +51,6 @@ public class FrameBuffer
             gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_T, GL4.GL_CLAMP_TO_EDGE);
 
 
-            // Set "renderedTexture" as our colour attachement #0
             gl.glFramebufferTexture(GL4.GL_FRAMEBUFFER, GL4.GL_DEPTH_ATTACHMENT, depthTextureHandle, 0);
         }
         else
@@ -95,63 +79,11 @@ public class FrameBuffer
 
     }
     
-    protected final void createTexture(GL4 gl, int i)
+    public final void bindTexture(GL4 gl, int attachment, int texTarget, int texHandle)
     {
-        // The texture we're going to render to
-        IntBuffer renderedTexture = Buffers.newDirectIntBuffer(1);
-        gl.glGenTextures(1, renderedTexture);
-        renderedTextureHandle[i] = renderedTexture.get();
-
-        // "Bind" the newly created texture : all future texture functions will modify this texture
-        gl.glBindTexture(GL4.GL_TEXTURE_2D, renderedTextureHandle[i]);
-
-        // Give an empty image to OpenGL ( the last "0" )
-        gl.glTexImage2D(GL4.GL_TEXTURE_2D, 0, GL4.GL_RGBA, width, height, 0, GL4.GL_RGBA, GL4.GL_UNSIGNED_BYTE, null);
-
-        // Poor filtering. Needed !
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MAG_FILTER, GL4.GL_LINEAR);
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MIN_FILTER, GL4.GL_LINEAR);
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_R, GL4.GL_CLAMP_TO_EDGE);
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_S, GL4.GL_CLAMP_TO_EDGE);
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_T, GL4.GL_CLAMP_TO_EDGE);
-
-
-        // Set "renderedTexture" as our colour attachement #0
-        gl.glFramebufferTexture(GL4.GL_FRAMEBUFFER, GL4.GL_COLOR_ATTACHMENT0+i, renderedTextureHandle[i], 0);
-    } 
-    
-    protected final void createCubeTexture(GL4 gl, int i)
-    {
-        // The texture we're going to render to
-        IntBuffer renderedTexture = Buffers.newDirectIntBuffer(1);
-        gl.glGenTextures(1, renderedTexture);
-        renderedTextureHandle[i] = renderedTexture.get();
-
-        // "Bind" the newly created texture : all future texture functions will modify this texture
-        gl.glBindTexture(GL4.GL_TEXTURE_CUBE_MAP, renderedTextureHandle[i]);
-
-        // Give an empty image to OpenGL ( the last "0" )
-        for (int face = 0; face < 6; i++)
-        {
-            gl.glTexImage2D(GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+face, 0, GL4.GL_RGBA, width, height, 0, GL4.GL_RGBA, GL4.GL_UNSIGNED_BYTE, null);
-        }
-
-        // Poor filtering. Needed !
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MAG_FILTER, GL4.GL_LINEAR);
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_MIN_FILTER, GL4.GL_LINEAR);
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_R, GL4.GL_CLAMP_TO_EDGE);
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_S, GL4.GL_CLAMP_TO_EDGE);
-        gl.glTexParameteri(GL4.GL_TEXTURE_2D, GL4.GL_TEXTURE_WRAP_T, GL4.GL_CLAMP_TO_EDGE);
-
-
-        // Set "renderedTexture" as our colour attachement #0
-        for (int face = 0; face < 6; face++)
-        {
-            gl.glFramebufferTexture2D(GL4.GL_FRAMEBUFFER,
-                    GL4.GL_COLOR_ATTACHMENT0+(nextAttachment++),
-                    GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+face,
-                    renderedTextureHandle[i], 0);
-        }
+        bind(gl);
+        gl.glFramebufferTexture2D(GL4.GL_FRAMEBUFFER, attachment, texTarget, texHandle, 0);
+        unbind(gl);
     }
     
     public final void bind(GL4 gl)
@@ -167,20 +99,16 @@ public class FrameBuffer
     public final void use(GL4 gl)
     {
         bind(gl);
-        
-        // Set the list of draw buffers.
-        int[] DrawBuffers = {GL4.GL_COLOR_ATTACHMENT0};
+        this.use(gl, new int[]{GL4.GL_COLOR_ATTACHMENT0});
+    }
+    
+    public final void use(GL4 gl, int[] DrawBuffers)
+    {
         gl.glDrawBuffers(1, DrawBuffers, 0); // "1" is the size of DrawBuffers
         
         gl.glClear(GL4.GL_COLOR_BUFFER_BIT | GL4.GL_DEPTH_BUFFER_BIT);
         
         gl.glViewport(0, 0, width, height);
-    }
-    
-    public final void bindTexture(GL4 gl, int i, int slot)
-    {
-        gl.glActiveTexture(slot);
-        gl.glBindTexture(GL4.GL_TEXTURE_2D, renderedTextureHandle[i]);
     }
     
     public final void bindDepthBuffer(GL4 gl, int slot)
@@ -192,5 +120,55 @@ public class FrameBuffer
     public final boolean hasDepthTexture()
     {
         return hasDepth;
+    }
+    
+    public void writeBufferToFile(GL4 gl, File outputFile, int a) throws IOException {
+
+          ByteBuffer pixelsRGB = Buffers.newDirectByteBuffer(width * height * 3);
+
+          gl.glReadBuffer(GL4.GL_COLOR_ATTACHMENT0+a);
+          gl.glPixelStorei(GL4.GL_PACK_ALIGNMENT, 1);
+
+          gl.glReadPixels(0,                    // GLint x
+                      0,                    // GLint y
+                      width,                     // GLsizei width
+                      height,              // GLsizei height
+                      GL4.GL_RGB,              // GLenum format
+                      GL4.GL_UNSIGNED_BYTE,        // GLenum type
+                      pixelsRGB);               // GLvoid *pixels
+
+          int[] pixelInts = new int[width * height];
+
+          // Convert RGB bytes to ARGB ints with no transparency. Flip image vertically by reading the
+          // rows of pixels in the byte buffer in reverse - (0,0) is at bottom left in OpenGL.
+
+          int p = width * height * 3; // Points to first byte (red) in each row.
+          int q;                  // Index into ByteBuffer
+          int i = 0;                  // Index into target int[]
+          int w3 = width*3;         // Number of bytes in each row
+
+          for (int row = 0; row < height; row++) {
+                p -= w3;
+                q = p;
+                for (int col = 0; col < width; col++) {
+                      int iR = pixelsRGB.get(q++);
+                      int iG = pixelsRGB.get(q++);
+                      int iB = pixelsRGB.get(q++);
+
+                      pixelInts[i++] = 0xFF000000
+                                  | ((iR & 0x000000FF) << 16)
+                                  | ((iG & 0x000000FF) << 8)
+                                  | (iB & 0x000000FF);
+                }
+
+          }
+
+          BufferedImage bufferedImage =
+                new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+          bufferedImage.setRGB(0, 0, width, height, pixelInts, 0, width);
+
+        ImageIO.write(bufferedImage, "PNG", outputFile);
+
     }
 }

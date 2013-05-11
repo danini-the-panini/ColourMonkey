@@ -36,14 +36,19 @@ public class ColourMonkey
     int meshIndex;
     Mesh currentMesh;
     
-    Shader sbShader;
+    Shader sbShader, smShader;
     NDCQuad ndcQuad;
     
     Shader waterShader, cloudShader;
     Grid water, clouds;
     
+    TextureCubeMap skyMap;
+    FrameBuffer skymapBuffer;
+    Texture reflection;
     FrameBuffer reflectBuffer;
+    Texture postTexture;
     FrameBuffer postBuffer;
+    // Texture shadowMap; // contianed in FBO at the moment
     FrameBuffer shadowBuffer;
     
     Shader postProcess, showoff;
@@ -51,7 +56,6 @@ public class ColourMonkey
     
     int[] terrainTextures = new int[6];
     int[] grassTextures = new int[4];
-    int cloudTexture;
     
     Shader tShader, tpShader;
     Terrain terrain;
@@ -104,7 +108,7 @@ public class ColourMonkey
     
     float cloud_level = 150.0f;
     float cloud_speed = 0.5f;
-    float cloud_density = 0.50f;
+    float cloud_density = 0.90f;
     
     float fog_start = 150.0f;
     float fog_end = 250.0f;
@@ -124,7 +128,7 @@ public class ColourMonkey
             lightAt = new Vec3(0f, 0f, 0f),
             lightUp = new Vec3(0f, 1f, 0f);
     
-    int shadowRes = 8192;
+    int shadowRes = 1024;
     
     Vec4 clipPlane = new Vec4(0.0f, 1.0f, 0.0f, 0.0f);
     Mat4 clipWorld = Matrices.translate(new Mat4(1.0f), new Vec3(0.0f, -water_level, 0.0f));
@@ -149,6 +153,7 @@ public class ColourMonkey
         render(gl);
     }
     
+    private float lastFPSUpdate = 0;
     void update()
     {
         long nTime = System.nanoTime();
@@ -156,8 +161,13 @@ public class ColourMonkey
         lastUpdate = nTime;
         float delta = nanos/(float)NANOS_PER_SECOND; 
         time += delta;
+        lastFPSUpdate += delta;
 
-	Main.jframe.setTitle(String.format("Colour Monkey! FPS: %.2f",1.0f/delta));
+	if (lastFPSUpdate > 1.0f)
+        {
+            Main.jframe.setTitle(String.format("Colour Monkey! FPS: %.2f",1.0f/delta));
+            lastFPSUpdate -= 1.0f;
+        }
         
         float step = DELTA;
         
@@ -206,7 +216,9 @@ public class ColourMonkey
     
     void render(GL4 gl)
     {
-        /*shadowBuffer.use(gl);
+        updateSkymap(gl);
+        
+        shadowBuffer.use(gl);
         
             gl.glCullFace(GL4.GL_FRONT);
             renderScene(gl, lightView, lightProjection, false);
@@ -217,7 +229,7 @@ public class ColourMonkey
             gl.glEnable(GL4.GL_CLIP_DISTANCE0);
             renderScene(gl, mirror_view, true);
             renderGrass(gl, mirror_view, projection);
-            gl.glDisable(GL4.GL_CLIP_DISTANCE0);*/
+            gl.glDisable(GL4.GL_CLIP_DISTANCE0);
         
         if (ssaaToggle)
         {
@@ -235,10 +247,10 @@ public class ColourMonkey
         
             renderScene(gl, true);
 
-            reflectBuffer.bindTexture(gl, 0, GL.GL_TEXTURE6);
-        //    renderWater(gl, view, projection);
+            reflection.use(gl, GL.GL_TEXTURE6);
+            renderWater(gl, view, projection);
             
-        //    renderGrass(gl, view, projection);
+            renderGrass(gl, view, projection);
             
         if (ssaaToggle)
         {
@@ -247,7 +259,7 @@ public class ColourMonkey
             gl.glViewport(0, 0, w_width, w_height);
             gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
 
-                postBuffer.bindTexture(gl, 0, GL.GL_TEXTURE7);
+                postTexture.use(gl, GL.GL_TEXTURE7);
 
                 gl.glDisable(GL.GL_DEPTH_TEST);
                 renderPostProcessing(gl);
@@ -270,10 +282,11 @@ public class ColourMonkey
     }
     void renderScene(GL4 gl, Mat4 camera, Mat4 proj, boolean full)
     {
-//        renderSkybox(gl, camera, proj);
+        skyMap.use(gl, GL.GL_TEXTURE0);
+        renderSkymap(gl, camera, proj);
         renderTerrain(gl, camera, proj);
-        //renderMesh(gl, camera, proj);
-//        if (full) renderClouds(gl, camera, proj, time);
+        renderMesh(gl, camera, proj);
+        if (full) renderClouds(gl, camera, proj, time);
     }
     
     void renderPostProcessing(GL4 gl)
@@ -300,6 +313,21 @@ public class ColourMonkey
         ndcQuad.draw(gl);
     }
     
+    void updateSkymap(GL4 gl)
+    {
+        Mat4 smproj = Matrices.perspective(90, 1, NEAR, FAR);
+        for (int i = 0; i < 6; i++)
+        {
+            skymapBuffer.bindTexture(gl, GL4.GL_COLOR_ATTACHMENT0,
+                    GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+i, skyMap.getHandle());
+            skymapBuffer.use(gl);
+            
+            Mat4 smview = Utils.lookAtCube(new Vec3(0,0,0), GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+i);
+            
+            renderSkybox(gl, smview, smproj);
+        }
+    }
+    
     void renderSkybox(GL4 gl, Mat4 camera, Mat4 proj)
     {
         sbShader.use(gl);
@@ -312,13 +340,24 @@ public class ColourMonkey
         ndcQuad.draw(gl);
     }
     
+    void renderSkymap(GL4 gl, Mat4 camera, Mat4 proj)
+    {
+        smShader.use(gl);
+        
+        smShader.updateUniform(gl, "view", camera);
+        smShader.updateUniform(gl, "projection", proj);
+        smShader.updateUniform(gl, "aspect", aspect);
+        
+        ndcQuad.draw(gl);
+    }
+    
     void renderTerrain(GL4 gl, Mat4 camera, Mat4 proj)
     {
         tShader.use(gl);
         
         for (int i = 0; i < terrainTextures.length; i++)
         {
-            gl.glActiveTexture(GL.GL_TEXTURE0+i);
+            gl.glActiveTexture(GL.GL_TEXTURE1+i);
             gl.glBindTexture(GL.GL_TEXTURE_2D, terrainTextures[i]);
         }
         
@@ -349,7 +388,7 @@ public class ColourMonkey
         
         for (int i = 0; i < grassTextures.length; i++)
         {
-            gl.glActiveTexture(GL.GL_TEXTURE0+i);
+            gl.glActiveTexture(GL.GL_TEXTURE1+i);
             gl.glBindTexture(GL.GL_TEXTURE_2D, grassTextures[i]);
         }
         
@@ -394,9 +433,6 @@ public class ColourMonkey
     
     void renderClouds(GL4 gl, Mat4 camera, Mat4 proj, float time)
     {
-        gl.glActiveTexture(GL.GL_TEXTURE0);
-        gl.glBindTexture(GL.GL_TEXTURE_2D, cloudTexture);
-        
         gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
         gl.glEnable(GL.GL_BLEND);
         cloudShader.use(gl);
@@ -442,6 +478,7 @@ public class ColourMonkey
 
     void init(GL4 gl)
     {
+        
         gl.glEnable(GL4bc.GL_VERTEX_ARRAY);
         gl.glEnable(GL.GL_DEPTH_TEST);
         gl.glEnable(GL.GL_CULL_FACE);
@@ -453,14 +490,21 @@ public class ColourMonkey
         
         lightProjection = Matrices.ortho(-300, 300, -50, 50, 10f, 250); // TODO: light projection
         
-        shadowBuffer = new FrameBuffer(gl, shadowRes, shadowRes, null, true);
+        //shadowMap = new Texture2D(gl, null, shadowRes, shadowRes, false);
+        shadowBuffer = new FrameBuffer(gl, shadowRes, shadowRes, true);
         
-        postBuffer = new FrameBuffer(gl, w_width*ssaa, w_height*ssaa,
-                new int[]{GL4.GL_TEXTURE_2D}, false);
+        postTexture = new Texture2D(gl, w_width*ssaa, w_height*ssaa);
+        postTexture.setParameters(gl, Texture.texParamsFBO);
+        postBuffer = new FrameBuffer(gl, w_width*ssaa, w_height*ssaa, false);
+        postBuffer.bindTexture(gl, GL4.GL_COLOR_ATTACHMENT0,
+                GL4.GL_TEXTURE_2D, postTexture.getHandle());
+        
         postProcess = new Shader(gl, "postprocess");
         showoff = new Shader(gl, "showoff");
         
-        // TODO: skymapBuffer = new FrameBuffer(gl, 1024, 1024, new int[]{ GL4.GL_TEXTURE_CUBE_MAP }, false);
+        skyMap = new TextureCubeMap(gl, null, 1024, 1024);
+        skyMap.setParameters(gl, Texture.texParamsSkyMap);
+        skymapBuffer = new FrameBuffer(gl, 1024, 1024, false);
 
         ndcQuad = new NDCQuad(gl);
         
@@ -482,10 +526,14 @@ public class ColourMonkey
         cloudShader = new Shader(gl, "clouds");
         clouds = new Grid(gl, 2048, 2048, 256, 256, 0, true);
         
-        reflectBuffer = new FrameBuffer(gl, w_width, w_height,
-                new int[]{ GL4.GL_TEXTURE_2D }, false);
+        reflection = new Texture2D(gl, null, w_width, w_height);
+        reflection.setParameters(gl, Texture.texParamsFBO);
+        reflectBuffer = new FrameBuffer(gl, w_width, w_height, false);
+        reflectBuffer.bindTexture(gl, GL4.GL_COLOR_ATTACHMENT0,
+                GL4.GL_TEXTURE_2D, reflection.getHandle());
         
         sbShader = new Shader(gl, "skybox");
+        smShader = new Shader(gl, "skymap");
         
         tShader = new Shader(gl, "terrain");
         tpShader = new Shader(gl, "grass");
@@ -514,6 +562,8 @@ public class ColourMonkey
         
         try
         {
+            gl.glActiveTexture(0);
+            
             int w_h[] = new int[2];
             ByteBuffer data = Utils.loadTexture("textures/Stone1.jpg", w_h);
             terrainTextures[0] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
@@ -544,9 +594,6 @@ public class ColourMonkey
             
             data = Utils.loadTexture("textures/noise.png", w_h);
             grassTextures[3] = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
-
-	    data = Utils.loadTexture("textures/fnoise.jpg", w_h);
-            cloudTexture = Utils.loadTexture(gl, data, w_h[0], w_h[1]);
 
         } catch (IOException ex)
         {

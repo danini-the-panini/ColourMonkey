@@ -2,8 +2,8 @@
 layout (points) in;
 layout (triangle_strip, max_vertices=54) out;
 
-layout (binding=2) uniform sampler2D noiseMap;
-layout (binding=3) uniform sampler2D noiseMap2;
+layout (binding=3) uniform sampler2D noiseMap;
+layout (binding=4) uniform sampler2D noiseMap2;
 layout (binding=8) uniform sampler2D shadowMap;
 
 uniform mat4 projection;
@@ -209,10 +209,14 @@ void main()
 
     float dist = distance(w_eye, w_pos);
 
+    // checking if grass is within the screen
+
+    float ndcPadding = 0.1;
+
     vec4 ndc_pos = projection * view * world * vec4(g_pos,1.0f);
     ndc_pos = abs(ndc_pos/ndc_pos.w);
 
-    if (ndc_pos.x > 1 || ndc_pos.y > 1 || ndc_pos.z > 1) return;
+    if (ndc_pos.x > 1+ndcPadding || ndc_pos.y > 1+ndcPadding || ndc_pos.z > 1+ndcPadding) return;
 
     if (dist > 70) return; // skip distant grass (or at least make it less dense?)
 

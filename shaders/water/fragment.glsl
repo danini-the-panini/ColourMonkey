@@ -1,5 +1,4 @@
 #version 420
-layout (binding=6) uniform sampler2D reflection;
 
 //
 // Description : Array and textureless GLSL 2D/3D/4D simplex 
@@ -106,6 +105,10 @@ float snoise(vec3 v)
 
 /// AND THE REST IS ALL MINE ///
 
+layout (binding = 0) uniform samplerCube skymap;
+
+layout (binding=6) uniform sampler2D reflection;
+
 uniform vec3 sun;
 uniform float time;
 
@@ -124,12 +127,6 @@ in vec3 w_eye;
 
 layout (location = 0) out vec4 colour;
 
-// sky colours
-// got them from a photo
-const vec3 skytop = vec3(0.08984375f, 0.27734375f, 0.41796875f);
-const vec3 skymid = vec3(0.40625f, 0.65234375f, 0.66796875f);
-const vec3 skybot = vec3(0.78125f, 0.87890625f, 0.83203125f);
-
 vec3 samplesun(vec3 dir)
 {
     vec3 l = normalize(sun);
@@ -143,24 +140,6 @@ vec3 samplesun(vec3 dir)
     sun_colour.b = pow(max(dot(-l,-dir),0),300.0f);
 
     return sun_colour;
-}
-
-vec4 samplesky(vec3 dir)
-{
-
-    vec3 sun_colour = samplesun(dir);
-
-    vec3 sky;
-    if (dir.y > 0)
-    {
-        sky = mix(skymid, skytop, dir.y);
-    }
-    else
-    {
-        sky = mix(skymid, skybot, -dir.y);
-    }
-
-    return vec4(clamp(sky+sun_colour,0,1),1.0f);
 }
 
 float noise(vec3 v)
@@ -206,7 +185,6 @@ void main()
     float xoffset = -(nsample*2-1)*noise_scale*2;
 
     vec3 reflection = texture(reflection, vec2(x+xoffset, 1-(y+yoffset))).xyz;
-    vec3 environment = samplesky(ref).xyz;
 
 
     vec3 dir = w_eye - g_position;
@@ -215,7 +193,7 @@ void main()
     dir /= -dist; // = normalize(dir);
     float fog_factor = 1-clamp((dist-fog_start)/(fog_end-fog_start),0,1);
 
-    vec3 sky = samplesky(dir).xyz;
+    vec3 sky = texture(skymap, dir).rgb;
 
     vec3 water_tint = vec3(0.3046875f, 0.609375f, 0.55078125f);
 

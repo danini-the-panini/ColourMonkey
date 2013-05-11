@@ -105,7 +105,9 @@ float snoise(vec3 v)
 
 // END OF SOMEONE'S NOISE FUNCTION I GIT FROM THE INTERTUBES
 
-layout (binding = 0) uniform sampler2D fnoise;
+layout (binding = 0) uniform samplerCube skymap;
+
+//layout (binding = 1) uniform sampler2D fnoise;
 
 uniform vec3 sun;
 uniform float time;
@@ -118,33 +120,6 @@ in vec3 w_position;
 in vec3 w_eye;
 
 layout (location = 0) out vec4 colour;
-
-const vec3 skytop = vec3(0.08984375f, 0.27734375f, 0.41796875f);
-const vec3 skymid = vec3(0.40625f, 0.65234375f, 0.66796875f);
-const vec3 skybot = vec3(0.78125f, 0.87890625f, 0.83203125f);
-
-vec4 samplesky(vec3 dir)
-{
-    vec3 l = normalize(sun);
-
-    vec3 sun_colour;
-
-    sun_colour.r = pow(max(dot(-l,-dir),0),90.0f);
-    sun_colour.g = pow(max(dot(-l,-dir),0),200.0f);
-    sun_colour.b = pow(max(dot(-l,-dir),0),300.0f);
-
-    vec3 sky;
-    if (dir.y > 0)
-    {
-        sky = mix(skymid, skytop, dir.y);
-    }
-    else
-    {
-        sky = mix(skymid, skybot, -dir.y);
-    }
-
-    return vec4(clamp(sky+sun_colour,0,1),1.0f);
-}
 
 float mnoise(vec2 v, float t)
 {
@@ -199,22 +174,23 @@ void main()
     float dist = length(dir);
     dir /= -dist;
 
-    vec2 lookup_pos = w_position.xz*0.002;
-    lookup_pos.x += time*speed*0.001;
+    vec2 lookup_pos = w_position.xz;
+    lookup_pos.x += time*speed*0.01;
 
     float lookup_time = time*0.02f;
 
-//    float noise = mnoise(lookup_pos, lookup_time);
-    float noise = texture(fnoise, lookup_pos);
+    float noise = mnoise(lookup_pos, lookup_time);
+//    float noise = texture(fnoise, lookup_pos);
 
     float fog_factor = 1-clamp((dist-fog_start)/(fog_end-fog_start),0,1);
 
-    vec4 sky = samplesky(dir);
+    vec3 sky = texture(skymap, dir).rgb;
+
     vec3 l = normalize(sun);
     float glow = pow(max(dot(l,dir),0),10);
 
     vec4 grad = gradient(1.0-noise, glow);
 
-    colour = vec4(mix (sky.xyz, vec3(grad.rgb), fog_factor), grad.a);
+    colour = vec4(mix (sky, vec3(grad.rgb), fog_factor), grad.a);
 }
 
