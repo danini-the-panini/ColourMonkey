@@ -3,13 +3,15 @@
 layout (location=1) in vec3 position;
 layout (location=2) in vec3 normal;
 
-
 uniform mat4 projection;
 uniform mat4 world;
 uniform mat4 view;
 
 uniform mat4 lprojection;
 uniform mat4 lview;
+
+uniform mat4 clipWorld;
+uniform vec4 clipPlane;
 
 out vec3 g_normal;
 out vec3 g_position;
@@ -29,9 +31,10 @@ void main()
 
     g_normal = normalize((world * vec4(normal,0.0f)).xyz);
 
-    g_colour = position;
+    g_colour = position*0.5f;
     g_position = (world * vec4(position,1.0f)).xyz;
     l_position = bias * lprojection * lview * world * vec4(position,1.0f);
     gl_Position = projection * view * world * vec4(position,1.0f);
+    gl_ClipDistance[0] = dot(clipWorld * world * vec4(position,1.0f), clipPlane);
 }
 

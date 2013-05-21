@@ -1,36 +1,82 @@
 #version 420
 
+layout (binding=9) uniform samplerCube envMap;
+layout (binding=8) uniform sampler2D shadowMap;
+
 uniform vec3 sun;
 
 in vec3 g_normal;
-in vec3 g_tangent;
-in vec3 g_bitangent;
 in vec3 g_colour;
 in vec3 g_position;
 in vec3 w_eye;
 
+uniform int shadowToggle;
+
 layout (location = 0) out vec4 colour;
+
+in vec4 l_position;
+
+float shadowed(vec2 v, float dist)
+{
+    return texture(shadowMap, v).z < dist ? 1 : 0;
+}
 
 void main()
 {
-    float ia = 0.4f;
-    float id = 0.6f;
-   // float is = 1.0f;
-    float s = 100.0f;
+    // perspective division for the light position
+    vec4 ssLightPos = l_position / l_position.w;
+
+    float ia = 0.3f;
+    float id = 0.8f;
+    float is = 1.0f;
+    float s = 10.0f;
 
     vec3 v = normalize(w_eye-g_position);
     vec3 l = normalize(sun);
     vec3 r = normalize(reflect(-l,g_normal));
 
-    float ip = ia + max(dot(l,g_normal),0)*id; //+ pow(max(dot(r,v),0),s)*is;
+float epsilon = 0.0002;
+
+    vec2[] offsets = vec2[](
+        vec2(0,1),vec2(0,-1),vec2(1,0),vec2(-1,0),
+        vec2(1,1),vec2(1,-1),vec2(-1,-1),vec2(-1,1)
+    );
+
+    float shadow = 1.0;
+    float ip = ia;
+
+    ip = ia + max(dot(l,g_normal),0)*id + pow(max(dot(r,v),0),s)*is;
+
+    // only shadow if sun is above horizon
+    if (sun.y > 0)
+    {
+
+
+        shadow = shadowed(ssLightPos.xy, ssLightPos.z);
+
+        for (int i = 0; i < offsets.length(); i++)
+        {
+            shadow += shadowed(ssLightPos.xy + epsilon*offsets[i], ssLightPos.z);
+        }
+        for (int i = 0; i < offsets.length(); i++)
+        {
+            shadow += shadowed(ssLightPos.xy + 2*epsilon*offsets[i], ssLightPos.z);
+        }
+
+        shadow /= offsets.length()*2+1;
+
+
+        bool inShadow = shadowToggle == 1 && ssLightPos.x > 0 && ssLightPos.y > 0 && ssLightPos.x < 1 && ssLightPos.y < 1;
+
+        if (inShadow)
+            ip = mix (ip, ia, shadow);
+    }
 
     vec3 ref = normalize(reflect(-v, g_normal));
 
-    //vec4 env = texture(cubeMap, ref);
+    vec4 env = texture(envMap, ref);
 
-    vec4 env = samplesky(ref);
-
-    vec3 col = (env.xyz);
+    vec3 col = (env.xyz) * ip;
 
     colour = vec4(col, 1.0f);
 }

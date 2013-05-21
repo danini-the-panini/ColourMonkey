@@ -11,6 +11,9 @@ in vec3 w_eye;
 
 uniform int shadowToggle;
 
+uniform int chosen;
+uniform int mo;
+
 layout (location = 0) out vec4 colour;
 
 in vec4 l_position;
@@ -25,16 +28,16 @@ void main()
     // perspective division for the light position
     vec4 ssLightPos = l_position / l_position.w;
 
-    float ia = 0.1f;
-    float id = 0.6f;
-    float is = 0.3f;
-    float s = 50.0f;
+    float ia = 0.2f;
+    float id = 0.7f;
+    float is = 0.1f;
+    float s = 10.0f;
 
     vec3 v = normalize(w_eye-g_position);
     vec3 l = normalize(sun);
     vec3 r = normalize(reflect(-l,g_normal));
 
-float epsilon = 0.0002;
+    float epsilon = 0.0002;
 
     vec2[] offsets = vec2[](
         vec2(0,1),vec2(0,-1),vec2(1,0),vec2(-1,0),
@@ -44,11 +47,11 @@ float epsilon = 0.0002;
     float shadow = 1.0;
     float ip = ia;
 
+    ip = ia + max(dot(l,g_normal),0)*id + pow(max(dot(r,v),0),s)*is;
+
     // only shadow if sun is above horizon
     if (sun.y > 0)
     {
-
-        ip = ia + max(dot(l,g_normal),0)*id + pow(max(dot(r,v),0),s)*is;
 
         shadow = shadowed(ssLightPos.xy, ssLightPos.z);
 
@@ -71,6 +74,9 @@ float epsilon = 0.0002;
     }
 
     vec3 col = g_colour * ip;
+
+    if (mo == 1) col.g *= 3.0f;
+    else if (chosen == 1) col.g *= 2.0f;
 
     colour = vec4(col, 1.0f);
 }

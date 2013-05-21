@@ -12,8 +12,8 @@ const vec3 skymida = vec3(0.875f, 0.796875f, 0.66796875f);
 const vec3 skybota = vec3(0.91796875f, 0.640625, 0.3828125f);
 
 const vec3 skytopb = vec3(0.0f, 0.0f, 0.0f);
-const vec3 skymidb = vec3(0.0234375f, 0.05859375f, 0.1171875f);
-const vec3 skybotb = vec3(0.0234375f, 0.05859375f, 0.1171875f);
+const vec3 skymidb = vec3(0.01f, 0.025f, 0.05);
+const vec3 skybotb = vec3(0.01f, 0.025f, 0.05);
 
 const vec3 skytopc = vec3(0.0f, 0.25f, 0.5f);
 const vec3 skymidc = vec3(0.875f, 0.796875f, 0.66796875f);

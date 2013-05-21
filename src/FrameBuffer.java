@@ -122,8 +122,34 @@ public class FrameBuffer
         return hasDepth;
     }
     
+    public byte[] readPixel(GL4 gl, int x, int y, int a)
+    {
+          ByteBuffer pixelsRGB = Buffers.newDirectByteBuffer(4);
+          
+          bind(gl);
+          
+          gl.glReadBuffer(GL4.GL_COLOR_ATTACHMENT0+a);
+          gl.glPixelStorei(GL4.GL_PACK_ALIGNMENT, 1);
+          
+          gl.glReadPixels(
+                      x,                    // GLint x
+                      y,                    // GLint y
+                      1,                     // GLsizei width
+                      1,              // GLsizei height
+                      GL4.GL_RGBA,              // GLenum format
+                      GL4.GL_UNSIGNED_BYTE,        // GLenum type
+                      pixelsRGB);               // GLvoid *pixels
+          
+          byte[] result = new byte[4];
+          pixelsRGB.get(result);
+          
+          return result;
+    }
+    
     public void writeBufferToFile(GL4 gl, File outputFile, int a) throws IOException {
 
+          bind(gl);
+                  
           ByteBuffer pixelsRGB = Buffers.newDirectByteBuffer(width * height * 3);
 
           gl.glReadBuffer(GL4.GL_COLOR_ATTACHMENT0+a);

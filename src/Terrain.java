@@ -13,6 +13,7 @@ public class Terrain extends Mesh
     private FloatBuffer vertices;
     private IntBuffer indices;
     private int xGrid, yGrid;
+    private float width,length,height;
     
     private float samplei(int u, int v)
     {
@@ -49,6 +50,27 @@ public class Terrain extends Mesh
         return samplef((float)i/(float)xGrid,(float)j/(float)yGrid);
     }
     
+    public float getHeight(float x, float y)
+    {
+        x+=width/2;
+        y+=length/2;
+        return height * (samplef(x/width,y/length) - 0.5f);
+    }
+    
+    public Vec3 getNormal(float x, float y)
+    {
+        final float QUAD_WIDTH = width/xGrid;
+        final float QUAD_LENGTH = length/yGrid;
+        
+        float Hx = getHeight(x+QUAD_WIDTH, y) - getHeight(x-QUAD_WIDTH, y);
+        Hx /= QUAD_WIDTH*2;
+
+        float Hz = getHeight(x, y+QUAD_LENGTH) - getHeight(x, y-QUAD_LENGTH);
+        Hz /= QUAD_LENGTH*2;
+
+        return new Vec3(-Hx, 1.0f, -Hz).getUnitVector();
+    }
+    
     public Terrain(GL4 gl, float width, float length, float height,
             int xGrid, int yGrid, BufferedImage heightmap)
     {
@@ -63,6 +85,10 @@ public class Terrain extends Mesh
         this.xGrid = xGrid;
         this.yGrid = yGrid;
         this.heightmap = heightmap;
+        
+        this.width = width;
+        this.length = length;
+        this.height = height;
         
         final float QUAD_WIDTH = width/xGrid;
         final float QUAD_LENGTH = length/yGrid;

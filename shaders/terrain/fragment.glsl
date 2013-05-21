@@ -104,6 +104,7 @@ float shadowed(vec2 v, float dist)
     return texture(shadowMap, v).z < dist ? 1 : 0;
 }
 
+
 void main()
 {
     // perspective division for the light position
@@ -194,7 +195,6 @@ void main()
     // only shadow if sun is above horizon
     if (sun.y > 0)
     {
-
 
         shadow = shadowed(ssLightPos.xy, ssLightPos.z);
 

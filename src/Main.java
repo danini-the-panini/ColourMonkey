@@ -73,6 +73,12 @@ public class Main {
                 cx = e.getX();
                 cy = e.getY();
             }
+
+            @Override
+            public void mouseClicked(MouseEvent e)
+            {
+                app.mouseClicked(e.getX(), e.getY());
+            }
         };
         
         glcanvas.addMouseListener(mouse);

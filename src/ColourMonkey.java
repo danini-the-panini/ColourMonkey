@@ -1,4 +1,5 @@
 import com.hackoeur.jglm.*;
+import com.hackoeur.jglm.support.FastMath;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -30,10 +31,13 @@ public class ColourMonkey
     int w_width = WINDOW_WIDTH, w_height = WINDOW_HEIGHT;
     float aspect;
     
-    Shader shader;
-    ArrayList<Mesh> meshes = new ArrayList<Mesh>();
-    int meshIndex;
-    Mesh currentMesh;
+    Shader shinyShader;
+    Mesh monkey;
+    
+    Shader tankShader;
+    Mesh[] tanks = new Mesh[15];
+    int chosenTank = 0;
+    int moTank = -1;
     
     Shader sbShader, smShader;
     NDCQuad ndcQuad;
@@ -43,6 +47,8 @@ public class ColourMonkey
     
     TextureCubeMap skyMap;
     FrameBuffer skymapBuffer;
+    TextureCubeMap envMap;
+    FrameBuffer envmapBuffer;
     Texture reflection;
     FrameBuffer reflectBuffer;
     Texture postTexture;
@@ -50,7 +56,11 @@ public class ColourMonkey
     // Texture shadowMap; // contianed in FBO at the moment
     FrameBuffer shadowBuffer;
     
-    Shader postProcess, showoff;
+    Texture picking;
+    FrameBuffer pickingBuffer;
+    int clickX = -1, clickY = -1;
+    
+    Shader postProcess, showoff, pickingShader;
     int ssaa = 2; // amount of SSAA to apply;
     
     int[] terrainTextures = new int[6];
@@ -64,30 +74,9 @@ public class ColourMonkey
     static final float ANGLE_DELTA = 60.0f;
     /* Amount to move / scale by in one step. */
     static final float DELTA = 5f;
-
-    /* Amount of rotation around the x axis. */
-    float xRot = -35.0f;
-    /* Amount of rotation around the y axis. */
-    float yRot = 0.0f;
-    /* Amount of rotation around the z axis. */
-    float zRot = 0.0f;
     
     float camRotX = 0.0f;
     float camRotY = 0.0f;
-
-    /* Amount to scale the x axis by. */
-    float xScale = 5.0f;
-    /* Amount to scale the y axis by. */
-    float yScale = 5.0f;
-    /* Amount to scale the z axis by. */
-    float zScale = 5.0f;
-
-    /* Amount to move on the x axis. */
-    float xMove = -30.0f;
-    /* Amount to move on the y axis. */
-    float yMove = -1.8f;
-    /* Amount to move on the z axis. */
-    float zMove = 3.0f;
 
     /* Camera location. */
     Vec3 cameraEye = new Vec3(-12.48743f,  0.64550f, -7.89169f);
@@ -111,8 +100,6 @@ public class ColourMonkey
     
     float fog_start = 150.0f;
     float fog_end = 250.0f;
-    
-    Mat4 monkeyWorld;
            
     Mat4 view, projection, mirror_view;
     
@@ -122,12 +109,13 @@ public class ColourMonkey
     Vec3 sun = new Vec3(origin_sun);
     
     float daytime = 325.91772f;
+    boolean skyMapChanged = true;
     
     Vec3 lightEye = sun.multiply(384),
             lightAt = new Vec3(0f, 0f, 0f),
             lightUp = new Vec3(0f, 1f, 0f);
     
-    int shadowRes = 1024;
+    int shadowRes = 4096;
     
     Vec4 clipPlane = new Vec4(0.0f, 1.0f, 0.0f, 0.0f);
     Mat4 clipWorld = Matrices.translate(new Mat4(1.0f), new Vec3(0.0f, -water_level, 0.0f));
@@ -148,12 +136,12 @@ public class ColourMonkey
 
     void display(GL4 gl)
     {
-        update();
+        update(gl);
         render(gl);
     }
     
     private float lastFPSUpdate = 0;
-    void update()
+    void update(GL4 gl)
     {
         long nTime = System.nanoTime();
         long nanos = nTime-lastUpdate;
@@ -170,8 +158,18 @@ public class ColourMonkey
         
         float step = DELTA;
         
-        yRot += delta*50;
-        updateMonkeyWorld();
+        monkey.yRot += delta*5;
+        
+        if (clickX != -1)
+        {
+            System.out.println("Clickness! " + clickX + ", " + clickY);
+            
+            byte[] pickBytes = pickingBuffer.readPixel(gl, clickX, clickY, 0);
+            
+            System.out.println("Picked: " + Arrays.toString(pickBytes));
+            
+            clickX = clickY = -1;
+        }
         
         if (keys[KeyEvent.VK_SHIFT]) step *= 5;
         
@@ -199,7 +197,8 @@ public class ColourMonkey
            cameraEye = cameraEye.subtract(r);
            cameraAt = cameraAt.subtract(r);
         }
-        else if (keys[KeyEvent.VK_2])
+        
+        if (keys[KeyEvent.VK_2])
         {
             daytime += delta*33;
             if (daytime > 360)
@@ -214,18 +213,64 @@ public class ColourMonkey
             updateSun();
         }
         
+        
+        float angle = -(float)Math.toRadians(tanks[0].yRot);
+        float sin = (float)Math.sin(angle);
+        float cos = (float)Math.cos(angle);
+        float tdelta = 5*delta;
+        
+        Mesh tank = tanks[chosenTank];
+        
+        if (keys[KeyEvent.VK_UP])
+        {
+            tank.xMove += -(tdelta*sin);
+            tank.zMove += (tdelta*cos);
+            //tank.zMove += tdelta;
+        }
+        else if (keys[KeyEvent.VK_DOWN])
+        {
+            tank.xMove -= -(tdelta*sin);
+            tank.zMove -= (tdelta*cos);
+            //tank.zMove -= tdelta;
+        }
+        if (keys[KeyEvent.VK_LEFT])
+        {
+            tank.yRot += tdelta*ANGLE_DELTA;
+            //tank.xMove += tdelta;
+        }
+        else if (keys[KeyEvent.VK_RIGHT])
+        {
+            tank.yRot -= tdelta*ANGLE_DELTA;
+            //tank.xMove -= tdelta;
+        }
+        tank.yMove = terrain.getHeight(tank.xMove, tank.zMove);
+        Vec3 tankNormal = terrain.getNormal(tank.xMove, tank.zMove).multiply(0.5f);
+        Vec3 tankNX = new Vec3(tankNormal.getX(),tankNormal.getY(),0.0f).getUnitVector();
+        Vec3 tankNZ = new Vec3(0.0f,tankNormal.getY(),tankNormal.getZ()).getUnitVector();
+        //tank.yAxis = tankNormal;
+        tank.xRot = (float)FastMath.toDegrees(Math.asin(tankNZ.getZ()));
+        tank.zRot = -(float)FastMath.toDegrees(Math.asin(tankNX.getX()));
+        
         updateView();
     }
     
     void render(GL4 gl)
     {
-        updateSkymap(gl);
         
         shadowBuffer.use(gl);
         
             gl.glCullFace(GL4.GL_FRONT);
             renderScene(gl, lightView, lightProjection, false);
             gl.glCullFace(GL4.GL_BACK);
+            
+            
+        if (skyMapChanged)
+        {
+            updateSkymap(gl);
+            skyMapChanged = false;
+        }
+        
+        updateEnvMap(gl, monkey);
         
         reflectBuffer.use(gl);
         
@@ -233,6 +278,14 @@ public class ColourMonkey
             renderScene(gl, mirror_view, true);
             renderGrass(gl, mirror_view, projection);
             gl.glDisable(GL4.GL_CLIP_DISTANCE0);
+            
+        pickingBuffer.use(gl);
+        
+            for (int i = 0; i < tanks.length; i++)
+            {
+                pickingShader.updateUniform(gl, "id", i+1);
+                renderMesh(gl, view, projection, tanks[i], pickingShader);
+            }
         
         if (ssaaToggle)
         {
@@ -267,7 +320,7 @@ public class ColourMonkey
                 gl.glDisable(GL.GL_DEPTH_TEST);
                 renderPostProcessing(gl);
 
-                shadowBuffer.bindDepthBuffer(gl, GL.GL_TEXTURE7);
+                picking.use(gl, GL.GL_TEXTURE7);
                 renderShowoff(gl, w_width-110, w_height-110, 100, 100);
                 gl.glEnable(GL.GL_DEPTH_TEST);
         }
@@ -285,10 +338,25 @@ public class ColourMonkey
     }
     void renderScene(GL4 gl, Mat4 camera, Mat4 proj, boolean full)
     {
+        renderScene(gl, camera, proj, full, null);
+    }
+    void renderScene(GL4 gl, Mat4 camera, Mat4 proj, boolean full, Mesh skip)
+    {
         skyMap.use(gl, GL.GL_TEXTURE0);
+        envMap.use(gl, GL.GL_TEXTURE9);
         renderSkymap(gl, camera, proj);
         renderTerrain(gl, camera, proj);
-        renderMesh(gl, camera, proj);
+        if (skip != monkey)
+            renderMesh(gl, camera, proj, monkey, shinyShader);
+        for (int i = 0; i < tanks.length; i++)
+        {
+            if (skip != tanks[i])
+            {
+                tankShader.updateUniform(gl, "chosen", chosenTank == i ? 1 : 0);
+                tankShader.updateUniform(gl, "mo", moTank == i ? 1 : 0);
+                renderMesh(gl, camera, proj, tanks[i], tankShader);
+            }
+        }
         if (full) renderClouds(gl, camera, proj, time);
     }
     
@@ -328,6 +396,22 @@ public class ColourMonkey
             Mat4 smview = Utils.lookAtCube(new Vec3(0,0,0), GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+i);
             
             renderSkybox(gl, smview, smproj);
+        }
+    }
+    
+    void updateEnvMap(GL4 gl, Mesh mesh)
+    {
+        envMap.use(gl, 0);
+        Mat4 emproj = Matrices.perspective(90, 1, NEAR, FAR);
+        for (int i = 0; i < 6; i++)
+        {
+            envmapBuffer.bindTexture(gl, GL4.GL_COLOR_ATTACHMENT0,
+                    GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+i, envMap.getHandle());
+            envmapBuffer.use(gl);
+            
+            Mat4 emview = Utils.lookAtCube(new Vec3(mesh.xMove,mesh.yMove,mesh.zMove), GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+i);
+            
+            renderScene(gl, emview, emproj, true, mesh);
         }
     }
     
@@ -418,11 +502,11 @@ public class ColourMonkey
         gl.glDisable(GL.GL_BLEND);
     }
     
-    void renderMesh(GL4 gl, Mat4 camera, Mat4 proj)
+    void renderMesh(GL4 gl, Mat4 camera, Mat4 proj, Mesh mesh, Shader shader)
     {
         shader.use(gl);
         
-        shader.updateUniform(gl, "world", monkeyWorld);
+        shader.updateUniform(gl, "world", mesh.getWorldMatrix());
         shader.updateUniform(gl, "view", camera);
         shader.updateUniform(gl, "projection", proj);
         
@@ -432,7 +516,10 @@ public class ColourMonkey
         shader.updateUniform(gl, "sun", sun);
         shader.updateUniform(gl, "shadowToggle", shadowToggle ? 1 : 0);
         
-        currentMesh.draw(gl);
+        shader.updateUniform(gl, "clipPlane", clipPlane);
+        shader.updateUniform(gl, "clipWorld", clipWorld);
+        
+        mesh.draw(gl);
     }
     
     void renderClouds(GL4 gl, Mat4 camera, Mat4 proj, float time)
@@ -509,20 +596,29 @@ public class ColourMonkey
         skyMap = new TextureCubeMap(gl, null, 1024, 1024);
         skyMap.setParameters(gl, Texture.texParamsSkyMap);
         skymapBuffer = new FrameBuffer(gl, 1024, 1024, false);
+        
+        envMap = new TextureCubeMap(gl, null, 1024, 1024);
+        envMap.setParameters(gl, Texture.texParamsSkyMap);
+        envmapBuffer = new FrameBuffer(gl, 1024, 1024, false);
+        
+        pickingShader = new Shader(gl, "picking");
 
         ndcQuad = new NDCQuad(gl);
         
         File meshDir = new File("meshes");
-        String[] meshNames = meshDir.list();
-        Arrays.sort(meshNames);
-        for (int i = 0; i < meshNames.length; i++)
-        {
-            meshes.add(new WavefrontMesh(gl, meshNames[i]));
-        }
-        meshIndex = 0;
-        currentMesh = meshes.get(meshIndex);
         
-        shader = new Shader(gl, "monkey");
+        monkey = new WavefrontMesh(gl, "monkey.obj");
+        
+        monkey.xScale = monkey.yScale = monkey.zScale = 5.0f;
+        monkey.xMove = -30.0f;
+        monkey.yMove = -1.8f;
+        monkey.zMove = 3.0f;
+        
+        shinyShader = new Shader(gl, "shiny");
+        
+        tanks[0] = new WavefrontMesh(gl, "tank.obj");
+        
+        tankShader = new Shader(gl, "monkey");
         
         waterShader = new Shader(gl, "water");
         water = new Grid(gl, 512, 512, 20, 20, water_level);
@@ -535,6 +631,12 @@ public class ColourMonkey
         reflectBuffer = new FrameBuffer(gl, w_width, w_height, false);
         reflectBuffer.bindTexture(gl, GL4.GL_COLOR_ATTACHMENT0,
                 GL4.GL_TEXTURE_2D, reflection.getHandle());
+        
+        picking = new Texture2D(gl, w_width, w_height);
+        picking.setParameters(gl, Texture.texParamsFBO);
+        pickingBuffer = new FrameBuffer(gl, w_width, w_height, false);
+        pickingBuffer.bindTexture(gl, GL4.GL_COLOR_ATTACHMENT0,
+                GL4.GL_TEXTURE_2D, picking.getHandle());
         
         sbShader = new Shader(gl, "skybox");
         smShader = new Shader(gl, "skymap");
@@ -607,7 +709,6 @@ public class ColourMonkey
         updateProjection(WINDOW_WIDTH, WINDOW_HEIGHT);
         updateView();
         updateSun();
-        updateMonkeyWorld();
         
         lastUpdate = System.nanoTime();
     }
@@ -620,15 +721,6 @@ public class ColourMonkey
 
         switch (key)
         {
-            case '[':
-                meshIndex--;
-                if (meshIndex < 0) meshIndex = meshes.size()-1;
-                currentMesh = meshes.get(meshIndex);
-                break;
-            case ']':
-                meshIndex = (meshIndex+1)%meshes.size();
-                currentMesh = meshes.get(meshIndex);
-                break;
             case KEY_ESCAPE:
                 System.out.printf("Bye!\n");
                 System.exit(0);
@@ -671,6 +763,13 @@ public class ColourMonkey
         updateView();
 
     }
+    
+    void mouseClicked(int x, int y)
+    {
+        clickX = x;
+        clickY = y;
+        
+    }
 
     void reshape(GL4 gl, int newWidth, int newHeight)
     {
@@ -699,8 +798,6 @@ public class ColourMonkey
 
     void updateView()
     {
-        System.out.println("cameraEye = " + cameraEye.toString());
-        System.out.println("cameraAt = " + cameraAt.toString());
         
         view = Matrices.lookAt(cameraEye, cameraAt, cameraUp);
         
@@ -708,26 +805,8 @@ public class ColourMonkey
                 new Vec3(cameraEye.getX(),2*water_level-cameraEye.getY(),cameraEye.getZ()),
                 new Vec3(cameraAt.getX(),2*water_level-cameraAt.getY(),cameraAt.getZ()),
                 cameraUp);
-    }
-
-    void updateMonkeyWorld()
-    {
-        monkeyWorld = new Mat4(1f);
-
-        Vec3 translation = new Vec3(xMove, yMove, zMove);
-        monkeyWorld = Matrices.translate(monkeyWorld, translation);
-
-        Vec3 yAxis = new Vec3(0, 1, 0);
-        monkeyWorld = Matrices.rotate(monkeyWorld, yRot, yAxis);
         
-        Vec3 xAxis = new Vec3(1, 0, 0);
-        monkeyWorld = Matrices.rotate(monkeyWorld, xRot, xAxis);
-
-        Vec3 zAxis = new Vec3(0, 0, 1);
-        monkeyWorld = Matrices.rotate(monkeyWorld, zRot, zAxis);
-
-        Vec3 scales = new Vec3(xScale, yScale, zScale);
-        monkeyWorld = Matrices.scale(monkeyWorld, scales);
+        updateSunView();
     }
     
     void updateSun()
@@ -753,7 +832,21 @@ public class ColourMonkey
         lightView = Matrices.lookAt(
                 lightEye, lightAt, lightUp);
         
+        final float SIZE = 64;
+        
         Vec4[] ps = {
+            lightView.multiply(new Vec4(cameraEye.getX()-SIZE,-25,cameraEye.getZ()+SIZE,1)),
+            lightView.multiply(new Vec4(cameraEye.getX()+SIZE,-25,cameraEye.getZ()+SIZE,1)),
+            lightView.multiply(new Vec4(cameraEye.getX()+SIZE,-25,cameraEye.getZ()-SIZE,1)),
+            lightView.multiply(new Vec4(cameraEye.getX()-SIZE,-25,cameraEye.getZ()-SIZE,1)),
+            lightView.multiply(new Vec4(cameraEye.getX()-SIZE,25,cameraEye.getZ()+SIZE,1)),
+            lightView.multiply(new Vec4(cameraEye.getX()+SIZE,25,cameraEye.getZ()+SIZE,1)),
+            lightView.multiply(new Vec4(cameraEye.getX()+SIZE,25,cameraEye.getZ()-SIZE,1)),
+            lightView.multiply(new Vec4(cameraEye.getX()-SIZE,25,cameraEye.getZ()-SIZE,1))
+        };
+        
+        
+        Vec4[] psBig = {
             lightView.multiply(new Vec4(-256,-25,256,1)),
             lightView.multiply(new Vec4(256,-25,256,1)),
             lightView.multiply(new Vec4(256,-25,-256,1)),
@@ -768,8 +861,8 @@ public class ColourMonkey
                 right = ps[0].getX(),
                 top = ps[0].getY(),
                 bottom = ps[0].getY(),
-                near = -ps[0].getZ(),
-                far = -ps[0].getZ();
+                near = -psBig[0].getZ(),
+                far = -psBig[0].getZ();
         
         for (int i = 1; i < ps.length; i++)
         {
@@ -777,13 +870,11 @@ public class ColourMonkey
             right = Math.max(right, ps[i].getX());
             top = Math.max(top, ps[i].getY());
             bottom = Math.min(bottom, ps[i].getY());
-            near = Math.min(near, -ps[i].getZ());
-            far = Math.max(far, -ps[i].getZ());
+            near = Math.min(near, -psBig[i].getZ());
+            far = Math.max(far, -psBig[i].getZ());
         }
         
         left += 10; right-=10; top -= 10; bottom += 10;
-        
-        System.out.printf("daytime: %g\n", daytime);
         
         float Sx = 2.0f/(right-left),
                 Sy = 2.0f/(top-bottom),
@@ -800,5 +891,7 @@ public class ColourMonkey
                     Matrices.ortho(left, right, bottom, top, near, far)
                 //)
                 ;
+        
+        skyMapChanged = true;
     }
 }
