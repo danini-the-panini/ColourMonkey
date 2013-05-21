@@ -188,11 +188,13 @@ void main()
     float shadow = 1.0;
     float ip = ia;
 
+
+    ip = ia + max(dot(l,N_for_lighting),0)*id + pow(max(dot(r,v),0),s)*is;
+
     // only shadow if sun is above horizon
     if (sun.y > 0)
     {
 
-        ip = ia + max(dot(l,N_for_lighting),0)*id + pow(max(dot(r,v),0),s)*is;
 
         shadow = shadowed(ssLightPos.xy, ssLightPos.z);
 
@@ -213,11 +215,13 @@ void main()
             ip = mix (ip, ia, shadow);
 
         // DEBUG MAGENTA
-        /*if (inShadow)
-            blended_color = mix (blended_color, vec4(1,0,1,1), 0.5);*/
+        //if (inShadow)
+        //   blended_color = mix (blended_color, vec4(1,0,1,1), 0.5);
 
-        blended_color.xyz *= ip;
     }
+    else ip = ia;
+
+    blended_color.xyz *= ip;
     
     colour = vec4(mix(sky, blended_color.xyz, fog_factor), 1.0f);
 }

@@ -540,4 +540,29 @@ public final class Mat4 extends AbstractMat {
                     m03*v.x + m13*v.y + m23*v.z + m33*v.w
             );
         }
+        
+        public Mat4 multiply(Mat4 m)
+        {
+            return new Mat4(
+                    m00*m.m00 + m10*m.m01 + m20*m.m02 + m30*m.m03,
+                    m01*m.m00 + m11*m.m01 + m21*m.m02 + m31*m.m03,
+                    m02*m.m00 + m12*m.m01 + m22*m.m02 + m32*m.m03,
+                    m03*m.m00 + m13*m.m01 + m23*m.m02 + m33*m.m03,
+                    
+                    m00*m.m10 + m10*m.m11 + m20*m.m12 + m30*m.m13,
+                    m01*m.m10 + m11*m.m11 + m21*m.m12 + m31*m.m13,
+                    m02*m.m10 + m12*m.m11 + m22*m.m12 + m32*m.m13,
+                    m03*m.m10 + m13*m.m11 + m23*m.m12 + m33*m.m13,
+                    
+                    m00*m.m20 + m10*m.m21 + m20*m.m22 + m30*m.m23,
+                    m01*m.m20 + m11*m.m21 + m21*m.m22 + m31*m.m23,
+                    m02*m.m20 + m12*m.m21 + m22*m.m22 + m32*m.m23,
+                    m03*m.m20 + m13*m.m21 + m23*m.m22 + m33*m.m23,
+                    
+                    m00*m.m30 + m10*m.m31 + m20*m.m32 + m30*m.m33,
+                    m01*m.m30 + m11*m.m31 + m21*m.m32 + m31*m.m33,
+                    m02*m.m30 + m12*m.m31 + m22*m.m32 + m32*m.m33,
+                    m03*m.m30 + m13*m.m31 + m23*m.m32 + m33*m.m33
+            );
+        }
 }

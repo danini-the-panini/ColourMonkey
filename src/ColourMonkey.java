@@ -1,4 +1,3 @@
-
 import com.hackoeur.jglm.*;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
@@ -91,9 +90,9 @@ public class ColourMonkey
     float zMove = 3.0f;
 
     /* Camera location. */
-    Vec3 cameraEye = new Vec3(2f, 2f, 2f);
+    Vec3 cameraEye = new Vec3(-12.48743f,  0.64550f, -7.89169f);
     /* Vector the camera is looking along. */
-    Vec3 cameraAt = new Vec3(0f, 0f, 0f);
+    Vec3 cameraAt = new Vec3(-14.68075f, 1.16453f, -5.26110f);
     /* Up direction from the camera. */
     Vec3 cameraUp = new Vec3(0f, 1f, 0f);
 
@@ -119,12 +118,12 @@ public class ColourMonkey
     
     Mat4 lightView, lightProjection;
     
-    Vec3 origin_sun = new Vec3(-2.0f,1.5f,5.0f);
+    Vec3 origin_sun = new Vec3(-2.0f,0f,5.0f).getUnitVector();
     Vec3 sun = new Vec3(origin_sun);
     
-    float daytime = 0.0f;
+    float daytime = 325.91772f;
     
-    Vec3 lightEye = new Vec3(sun).multiply(10),
+    Vec3 lightEye = sun.multiply(384),
             lightAt = new Vec3(0f, 0f, 0f),
             lightUp = new Vec3(0f, 1f, 0f);
     
@@ -202,12 +201,16 @@ public class ColourMonkey
         }
         else if (keys[KeyEvent.VK_2])
         {
-            daytime += 1.0f;
+            daytime += delta*33;
+            if (daytime > 360)
+                daytime = daytime - 360.0f;
             updateSun();
         }
         else if (keys[KeyEvent.VK_3])
         {
-            daytime -= 1.0f;
+            daytime -= delta*33;
+            if (daytime < 0)
+                daytime = daytime + 360.0f;
             updateSun();
         }
         
@@ -336,6 +339,7 @@ public class ColourMonkey
         sbShader.updateUniform(gl, "projection", proj);
         sbShader.updateUniform(gl, "aspect", aspect);
         sbShader.updateUniform(gl, "sun", sun);
+        sbShader.updateUniform(gl, "time", daytime/360.0f);
         
         ndcQuad.draw(gl);
     }
@@ -602,6 +606,7 @@ public class ColourMonkey
 
         updateProjection(WINDOW_WIDTH, WINDOW_HEIGHT);
         updateView();
+        updateSun();
         updateMonkeyWorld();
         
         lastUpdate = System.nanoTime();
@@ -694,14 +699,15 @@ public class ColourMonkey
 
     void updateView()
     {
+        System.out.println("cameraEye = " + cameraEye.toString());
+        System.out.println("cameraAt = " + cameraAt.toString());
+        
         view = Matrices.lookAt(cameraEye, cameraAt, cameraUp);
         
         mirror_view = Matrices.lookAt(
                 new Vec3(cameraEye.getX(),2*water_level-cameraEye.getY(),cameraEye.getZ()),
                 new Vec3(cameraAt.getX(),2*water_level-cameraAt.getY(),cameraAt.getZ()),
                 cameraUp);
-        
-        updateSunView();
     }
 
     void updateMonkeyWorld()
@@ -742,9 +748,57 @@ public class ColourMonkey
         //lightAt = new Vec3(cameraEye.getX(),0,cameraEye.getZ());
         //lightEye = sun.getUnitVector().multiply(50).add(lightAt);
         
-        lightEye = sun.multiply(10);
+        lightEye = sun.multiply(384);
         
         lightView = Matrices.lookAt(
                 lightEye, lightAt, lightUp);
+        
+        Vec4[] ps = {
+            lightView.multiply(new Vec4(-256,-25,256,1)),
+            lightView.multiply(new Vec4(256,-25,256,1)),
+            lightView.multiply(new Vec4(256,-25,-256,1)),
+            lightView.multiply(new Vec4(-256,-25,-256,1)),
+            lightView.multiply(new Vec4(-256,25,256,1)),
+            lightView.multiply(new Vec4(256,25,256,1)),
+            lightView.multiply(new Vec4(256,25,-256,1)),
+            lightView.multiply(new Vec4(-256,25,-256,1))
+        };
+        
+        float left = ps[0].getX(),
+                right = ps[0].getX(),
+                top = ps[0].getY(),
+                bottom = ps[0].getY(),
+                near = -ps[0].getZ(),
+                far = -ps[0].getZ();
+        
+        for (int i = 1; i < ps.length; i++)
+        {
+            left = Math.min(left, ps[i].getX());
+            right = Math.max(right, ps[i].getX());
+            top = Math.max(top, ps[i].getY());
+            bottom = Math.min(bottom, ps[i].getY());
+            near = Math.min(near, -ps[i].getZ());
+            far = Math.max(far, -ps[i].getZ());
+        }
+        
+        left += 10; right-=10; top -= 10; bottom += 10;
+        
+        System.out.printf("daytime: %g\n", daytime);
+        
+        float Sx = 2.0f/(right-left),
+                Sy = 2.0f/(top-bottom),
+                Ox = -0.5f*(right+left)*Sx,
+                Oy = -0.5f*(top+bottom)*Sy;
+        
+        lightProjection = 
+                /*new Mat4(
+                    Sx, 0,  0,  0,
+                    0,  Sy, 0,  0,
+                    0,  0,  1,  0,
+                    Ox, Oy, 0,  1
+                ).multiply(*/
+                    Matrices.ortho(left, right, bottom, top, near, far)
+                //)
+                ;
     }
 }
