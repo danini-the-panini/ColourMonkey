@@ -73,10 +73,16 @@ void main()
             ip = mix (ip, ia, shadow);
     }
 
-    vec3 col = g_colour * ip;
+    vec3 col = g_colour;
 
-    if (mo == 1) col.g *= 3.0f;
-    else if (chosen == 1) col.g *= 2.0f;
+    if (chosen == 0)
+    {
+        if (mo == 1) col = vec3(1.0f,0,1.0f);
+        else col = vec3(0.5, 0.5, 0.5);
+    }
+    else col = g_colour;
+
+    col *= ip;
 
     colour = vec4(col, 1.0f);
 }

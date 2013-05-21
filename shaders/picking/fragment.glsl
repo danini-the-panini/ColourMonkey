@@ -1,12 +1,12 @@
 #version 420
 
-in vec4 g_colour;
+in vec3 g_colour;
 
 layout (location = 0) out vec4 colour;
 
 void main()
 {
-    //colour = g_colour;
-    colour = vec4(1.0, 0.0, 1.0, 1.0);
+    colour = vec4(g_colour,1.0f);
+    //colour = vec4(1.0, 0.0, 1.0, 1.0);
 }
 

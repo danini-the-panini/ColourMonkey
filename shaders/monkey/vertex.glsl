@@ -31,7 +31,7 @@ void main()
 
     g_normal = normalize((world * vec4(normal,0.0f)).xyz);
 
-    g_colour = position*0.5f;
+    g_colour = position * 0.5f;
     g_position = (world * vec4(position,1.0f)).xyz;
     l_position = bias * lprojection * lview * world * vec4(position,1.0f);
     gl_Position = projection * view * world * vec4(position,1.0f);

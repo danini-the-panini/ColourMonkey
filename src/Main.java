@@ -68,10 +68,16 @@ public class Main {
 
                 if (e.getX() == cx && e.getY() == cy) return;
 
-                app.mouseMoved(cx-e.getX(), cy-e.getY());
+                app.mouseDragged(cx-e.getX(), cy-e.getY());
 
                 cx = e.getX();
                 cy = e.getY();
+            }
+
+            @Override
+            public void mouseMoved(MouseEvent e)
+            {
+                app.mouseMoved(e.getX(), e.getY());
             }
 
             @Override

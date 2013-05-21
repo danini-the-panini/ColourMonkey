@@ -9,11 +9,11 @@ uniform mat4 view;
 
 uniform int id;
 
-out vec4 g_colour;
+out vec3 g_colour;
 
 void main()
 {
-    g_colour = vec4(float(id & 1), float((id >> 1) & 1), float((id >> 2) & 1), (id >> 3) & 1);
+    g_colour = vec3(float((id >> 0) & 1), float((id >> 1) & 1), float((id >> 2) & 1));
 
     gl_Position = projection * view * world * vec4(position,1.0f);
 }

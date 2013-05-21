@@ -1,7 +1,7 @@
 #version 420
 
-layout (binding=9) uniform samplerCube envMap;
-layout (binding=8) uniform sampler2D shadowMap;
+layout (binding = 8) uniform sampler2D shadowMap;
+layout (binding = 9) uniform samplerCube envMap;
 
 uniform vec3 sun;
 
@@ -35,7 +35,7 @@ void main()
     vec3 l = normalize(sun);
     vec3 r = normalize(reflect(-l,g_normal));
 
-float epsilon = 0.0002;
+    float epsilon = 0.0002;
 
     vec2[] offsets = vec2[](
         vec2(0,1),vec2(0,-1),vec2(1,0),vec2(-1,0),

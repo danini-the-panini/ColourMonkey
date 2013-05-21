@@ -5,7 +5,6 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Arrays;
 import javax.imageio.ImageIO;
 import javax.media.opengl.GL;
@@ -32,10 +31,12 @@ public class ColourMonkey
     float aspect;
     
     Shader shinyShader;
-    Mesh monkey;
+    Mesh monkeyMesh;
+    Transformation monkey = new Transformation();
     
     Shader tankShader;
-    Mesh[] tanks = new Mesh[15];
+    Mesh tankMesh;
+    Transformation[] tanks = new Transformation[7];
     int chosenTank = 0;
     int moTank = -1;
     
@@ -59,6 +60,7 @@ public class ColourMonkey
     Texture picking;
     FrameBuffer pickingBuffer;
     int clickX = -1, clickY = -1;
+    int mouseX = 0, mouseY = 0;
     
     Shader postProcess, showoff, pickingShader;
     int ssaa = 2; // amount of SSAA to apply;
@@ -115,7 +117,7 @@ public class ColourMonkey
             lightAt = new Vec3(0f, 0f, 0f),
             lightUp = new Vec3(0f, 1f, 0f);
     
-    int shadowRes = 4096;
+    int shadowRes = 2048;
     
     Vec4 clipPlane = new Vec4(0.0f, 1.0f, 0.0f, 0.0f);
     Mat4 clipWorld = Matrices.translate(new Mat4(1.0f), new Vec3(0.0f, -water_level, 0.0f));
@@ -164,12 +166,16 @@ public class ColourMonkey
         {
             System.out.println("Clickness! " + clickX + ", " + clickY);
             
-            byte[] pickBytes = pickingBuffer.readPixel(gl, clickX, clickY, 0);
+            float[] pick = pickingBuffer.readPixel(gl, clickX, w_height-clickY, 0);
             
-            System.out.println("Picked: " + Arrays.toString(pickBytes));
+            System.out.println("Picked: " + Arrays.toString(pick));
+            
+            chosenTank = pickToId(pick);
             
             clickX = clickY = -1;
         }
+        
+        moTank = pickToId(pickingBuffer.readPixel(gl, mouseX, w_height-mouseY, 0));
         
         if (keys[KeyEvent.VK_SHIFT]) step *= 5;
         
@@ -214,49 +220,24 @@ public class ColourMonkey
         }
         
         
-        float angle = -(float)Math.toRadians(tanks[0].yRot);
-        float sin = (float)Math.sin(angle);
-        float cos = (float)Math.cos(angle);
-        float tdelta = 5*delta;
         
-        Mesh tank = tanks[chosenTank];
-        
-        if (keys[KeyEvent.VK_UP])
-        {
-            tank.xMove += -(tdelta*sin);
-            tank.zMove += (tdelta*cos);
-            //tank.zMove += tdelta;
-        }
-        else if (keys[KeyEvent.VK_DOWN])
-        {
-            tank.xMove -= -(tdelta*sin);
-            tank.zMove -= (tdelta*cos);
-            //tank.zMove -= tdelta;
-        }
-        if (keys[KeyEvent.VK_LEFT])
-        {
-            tank.yRot += tdelta*ANGLE_DELTA;
-            //tank.xMove += tdelta;
-        }
-        else if (keys[KeyEvent.VK_RIGHT])
-        {
-            tank.yRot -= tdelta*ANGLE_DELTA;
-            //tank.xMove -= tdelta;
-        }
-        tank.yMove = terrain.getHeight(tank.xMove, tank.zMove);
-        Vec3 tankNormal = terrain.getNormal(tank.xMove, tank.zMove).multiply(0.5f);
-        Vec3 tankNX = new Vec3(tankNormal.getX(),tankNormal.getY(),0.0f).getUnitVector();
-        Vec3 tankNZ = new Vec3(0.0f,tankNormal.getY(),tankNormal.getZ()).getUnitVector();
-        //tank.yAxis = tankNormal;
-        tank.xRot = (float)FastMath.toDegrees(Math.asin(tankNZ.getZ()));
-        tank.zRot = -(float)FastMath.toDegrees(Math.asin(tankNX.getX()));
+        if (chosenTank != -1)
+            updateTank(tanks[chosenTank], delta);
         
         updateView();
     }
     
-    void render(GL4 gl)
+    int pickToId(float[] pick)
     {
         
+            int id = 0;
+            for (int i = 0; i < 3; i++)
+                if (pick[i] > 0.5) id |= 1 << i;
+            return id -1;
+    }
+    
+    void render(GL4 gl)
+    {
         shadowBuffer.use(gl);
         
             gl.glCullFace(GL4.GL_FRONT);
@@ -270,7 +251,7 @@ public class ColourMonkey
             skyMapChanged = false;
         }
         
-        updateEnvMap(gl, monkey);
+        updateEnvMap(gl, monkeyMesh, monkey);
         
         reflectBuffer.use(gl);
         
@@ -283,8 +264,9 @@ public class ColourMonkey
         
             for (int i = 0; i < tanks.length; i++)
             {
+                pickingShader.use(gl);
                 pickingShader.updateUniform(gl, "id", i+1);
-                renderMesh(gl, view, projection, tanks[i], pickingShader);
+                renderMesh(gl, view, projection, tankMesh, tanks[i], pickingShader);
             }
         
         if (ssaaToggle)
@@ -317,12 +299,12 @@ public class ColourMonkey
 
                 postTexture.use(gl, GL.GL_TEXTURE7);
 
-                gl.glDisable(GL.GL_DEPTH_TEST);
+                //gl.glDisable(GL.GL_DEPTH_TEST);
                 renderPostProcessing(gl);
 
-                picking.use(gl, GL.GL_TEXTURE7);
-                renderShowoff(gl, w_width-110, w_height-110, 100, 100);
-                gl.glEnable(GL.GL_DEPTH_TEST);
+                //picking.use(gl, GL.GL_TEXTURE7);
+                //renderShowoff(gl, w_width-110, w_height-110, 100, 100);
+                //gl.glEnable(GL.GL_DEPTH_TEST);
         }
 
         gl.glFlush();
@@ -346,16 +328,16 @@ public class ColourMonkey
         envMap.use(gl, GL.GL_TEXTURE9);
         renderSkymap(gl, camera, proj);
         renderTerrain(gl, camera, proj);
-        if (skip != monkey)
-            renderMesh(gl, camera, proj, monkey, shinyShader);
+        if (skip != monkeyMesh)
+        {
+            renderMesh(gl, camera, proj, monkeyMesh, monkey, shinyShader);
+        }
         for (int i = 0; i < tanks.length; i++)
         {
-            if (skip != tanks[i])
-            {
-                tankShader.updateUniform(gl, "chosen", chosenTank == i ? 1 : 0);
-                tankShader.updateUniform(gl, "mo", moTank == i ? 1 : 0);
-                renderMesh(gl, camera, proj, tanks[i], tankShader);
-            }
+            tankShader.use(gl);
+            tankShader.updateUniform(gl, "chosen", chosenTank == i ? 1 : 0);
+            tankShader.updateUniform(gl, "mo", moTank == i ? 1 : 0);
+            renderMesh(gl, camera, proj, tankMesh, tanks[i], tankShader);
         }
         if (full) renderClouds(gl, camera, proj, time);
     }
@@ -399,9 +381,8 @@ public class ColourMonkey
         }
     }
     
-    void updateEnvMap(GL4 gl, Mesh mesh)
+    void updateEnvMap(GL4 gl, Mesh mesh, Transformation t)
     {
-        envMap.use(gl, 0);
         Mat4 emproj = Matrices.perspective(90, 1, NEAR, FAR);
         for (int i = 0; i < 6; i++)
         {
@@ -409,7 +390,7 @@ public class ColourMonkey
                     GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+i, envMap.getHandle());
             envmapBuffer.use(gl);
             
-            Mat4 emview = Utils.lookAtCube(new Vec3(mesh.xMove,mesh.yMove,mesh.zMove), GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+i);
+            Mat4 emview = Utils.lookAtCube(new Vec3(t.xMove, t.yMove, t.zMove), GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+i);
             
             renderScene(gl, emview, emproj, true, mesh);
         }
@@ -502,11 +483,11 @@ public class ColourMonkey
         gl.glDisable(GL.GL_BLEND);
     }
     
-    void renderMesh(GL4 gl, Mat4 camera, Mat4 proj, Mesh mesh, Shader shader)
+    void renderMesh(GL4 gl, Mat4 camera, Mat4 proj, Mesh mesh, Transformation t, Shader shader)
     {
         shader.use(gl);
         
-        shader.updateUniform(gl, "world", mesh.getWorldMatrix());
+        shader.updateUniform(gl, "world", t.getWorldMatrix());
         shader.updateUniform(gl, "view", camera);
         shader.updateUniform(gl, "projection", proj);
         
@@ -605,9 +586,7 @@ public class ColourMonkey
 
         ndcQuad = new NDCQuad(gl);
         
-        File meshDir = new File("meshes");
-        
-        monkey = new WavefrontMesh(gl, "monkey.obj");
+        monkeyMesh = new WavefrontMesh(gl, "monkey.obj");
         
         monkey.xScale = monkey.yScale = monkey.zScale = 5.0f;
         monkey.xMove = -30.0f;
@@ -616,7 +595,7 @@ public class ColourMonkey
         
         shinyShader = new Shader(gl, "shiny");
         
-        tanks[0] = new WavefrontMesh(gl, "tank.obj");
+        tankMesh = new WavefrontMesh(gl, "tank.obj");
         
         tankShader = new Shader(gl, "monkey");
         
@@ -705,6 +684,18 @@ public class ColourMonkey
         {
             System.err.println("Could not load texture: " + ex.getMessage());
         }
+        
+        for (int i = 0; i < tanks.length; i++)
+        {
+            tanks[i] = new Transformation();
+            
+            tanks[i].zMove = 20.0f;
+            tanks[i].xMove = -20 - i*5;
+            
+            tanks[i].yRot = 180.0f;
+            
+            updateTank(tanks[i], 0);
+        }
 
         updateProjection(WINDOW_WIDTH, WINDOW_HEIGHT);
         updateView();
@@ -741,8 +732,14 @@ public class ColourMonkey
         if (ke.getKeyCode() < keys.length)
             keys[ke.getKeyCode()] = false;
     }
-
+    
     void mouseMoved(int x, int y)
+    {
+        mouseX = x;
+        mouseY = y;
+    }
+
+    void mouseDragged(int x, int y)
     {
         final float LEFT_RIGHT_ROT = (2.0f*(float)x/(float)w_width) * ANGLE_DELTA;
         final float UP_DOWN_ROT = (2.0f*(float)y/(float)w_height) * ANGLE_DELTA;
@@ -893,5 +890,43 @@ public class ColourMonkey
                 ;
         
         skyMapChanged = true;
+    }
+    
+    void updateTank(Transformation tank, float delta)
+    {
+        float angle = -(float)Math.toRadians(tank.yRot);
+        float sin = (float)Math.sin(angle);
+        float cos = (float)Math.cos(angle);
+        float tdelta = 5*delta;
+        
+        if (keys[KeyEvent.VK_UP])
+        {
+            tank.xMove += -(tdelta*sin);
+            tank.zMove += (tdelta*cos);
+            //tank.zMove += tdelta;
+        }
+        else if (keys[KeyEvent.VK_DOWN])
+        {
+            tank.xMove -= -(tdelta*sin);
+            tank.zMove -= (tdelta*cos);
+            //tank.zMove -= tdelta;
+        }
+        if (keys[KeyEvent.VK_LEFT])
+        {
+            tank.yRot += tdelta*ANGLE_DELTA;
+            //tank.xMove += tdelta;
+        }
+        else if (keys[KeyEvent.VK_RIGHT])
+        {
+            tank.yRot -= tdelta*ANGLE_DELTA;
+            //tank.xMove -= tdelta;
+        }
+        tank.yMove = terrain.getHeight(tank.xMove, tank.zMove);
+        Vec3 tankNormal = terrain.getNormal(tank.xMove, tank.zMove).multiply(0.5f);
+        Vec3 tankNX = new Vec3(tankNormal.getX(),tankNormal.getY(),0.0f).getUnitVector();
+        Vec3 tankNZ = new Vec3(0.0f,tankNormal.getY(),tankNormal.getZ()).getUnitVector();
+        //tank.yAxis = tankNormal;
+        tank.xRot = (float)FastMath.toDegrees(Math.asin(tankNZ.getZ()));
+        tank.zRot = -(float)FastMath.toDegrees(Math.asin(tankNX.getX()));
     }
 }

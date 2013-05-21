@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import javax.imageio.ImageIO;
 import javax.media.opengl.GL4;
@@ -98,12 +99,12 @@ public class FrameBuffer
     
     public final void use(GL4 gl)
     {
-        bind(gl);
         this.use(gl, new int[]{GL4.GL_COLOR_ATTACHMENT0});
     }
     
     public final void use(GL4 gl, int[] DrawBuffers)
     {
+        bind(gl);
         gl.glDrawBuffers(1, DrawBuffers, 0); // "1" is the size of DrawBuffers
         
         gl.glClear(GL4.GL_COLOR_BUFFER_BIT | GL4.GL_DEPTH_BUFFER_BIT);
@@ -122,11 +123,10 @@ public class FrameBuffer
         return hasDepth;
     }
     
-    public byte[] readPixel(GL4 gl, int x, int y, int a)
+    public float[] readPixel(GL4 gl, int x, int y, int a)
     {
-          ByteBuffer pixelsRGB = Buffers.newDirectByteBuffer(4);
-          
-          bind(gl);
+        bind(gl);
+          FloatBuffer pixelsRGB = Buffers.newDirectFloatBuffer(4);
           
           gl.glReadBuffer(GL4.GL_COLOR_ATTACHMENT0+a);
           gl.glPixelStorei(GL4.GL_PACK_ALIGNMENT, 1);
@@ -137,19 +137,18 @@ public class FrameBuffer
                       1,                     // GLsizei width
                       1,              // GLsizei height
                       GL4.GL_RGBA,              // GLenum format
-                      GL4.GL_UNSIGNED_BYTE,        // GLenum type
+                      GL4.GL_FLOAT,        // GLenum type
                       pixelsRGB);               // GLvoid *pixels
           
-          byte[] result = new byte[4];
+          float[] result = new float[4];
           pixelsRGB.get(result);
           
           return result;
     }
     
     public void writeBufferToFile(GL4 gl, File outputFile, int a) throws IOException {
-
-          bind(gl);
-                  
+                
+        bind(gl);  
           ByteBuffer pixelsRGB = Buffers.newDirectByteBuffer(width * height * 3);
 
           gl.glReadBuffer(GL4.GL_COLOR_ATTACHMENT0+a);
