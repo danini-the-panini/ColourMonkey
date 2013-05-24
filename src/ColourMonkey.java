@@ -21,11 +21,11 @@ public class ColourMonkey
     /**
      * The window's initial width.
      */
-    static final int WINDOW_WIDTH = 1280;
+    static final int WINDOW_WIDTH = 1024;
     /**
      * The window's initial height.
      */
-    static final int WINDOW_HEIGHT = 768;
+    static final int WINDOW_HEIGHT = 600;
     
     int w_width = WINDOW_WIDTH, w_height = WINDOW_HEIGHT;
     float aspect;
@@ -122,12 +122,13 @@ public class ColourMonkey
     Vec4 clipPlane = new Vec4(0.0f, 1.0f, 0.0f, 0.0f);
     Mat4 clipWorld = Matrices.translate(new Mat4(1.0f), new Vec3(0.0f, -water_level, 0.0f));
     
-    boolean[] keys = new boolean[256];
+    boolean[] keys = new boolean[1024];
     
     long lastUpdate;
     float time = 0.0f;
     
-    boolean shadowToggle = true, ssaaToggle = false;
+    boolean shadowToggle = true, ssaaToggle = false, grassToggle = true,
+            waterToggle = true, envToggle = true, cloudToggle = true;
             
     public static final long NANOS_PER_SECOND = 1000000000l;
     
@@ -204,14 +205,14 @@ public class ColourMonkey
            cameraAt = cameraAt.subtract(r);
         }
         
-        if (keys[KeyEvent.VK_2])
+        if (keys[KeyEvent.VK_O])
         {
             daytime += delta*33;
             if (daytime > 360)
                 daytime = daytime - 360.0f;
             updateSun();
         }
-        else if (keys[KeyEvent.VK_3])
+        else if (keys[KeyEvent.VK_P])
         {
             daytime -= delta*33;
             if (daytime < 0)
@@ -238,11 +239,14 @@ public class ColourMonkey
     
     void render(GL4 gl)
     {
-        shadowBuffer.use(gl);
-        
-            gl.glCullFace(GL4.GL_FRONT);
-            renderScene(gl, lightView, lightProjection, false);
-            gl.glCullFace(GL4.GL_BACK);
+        if (shadowToggle)
+        {
+            shadowBuffer.use(gl);
+
+                gl.glCullFace(GL4.GL_FRONT);
+                renderScene(gl, lightView, lightProjection);
+                gl.glCullFace(GL4.GL_BACK);
+        }
             
             
         if (skyMapChanged)
@@ -251,14 +255,23 @@ public class ColourMonkey
             skyMapChanged = false;
         }
         
-        updateEnvMap(gl, monkeyMesh, monkey);
+        if (envToggle)
+            updateEnvMap(gl, monkeyMesh, monkey);
         
-        reflectBuffer.use(gl);
-        
-            gl.glEnable(GL4.GL_CLIP_DISTANCE0);
-            renderScene(gl, mirror_view, true);
-            renderGrass(gl, mirror_view, projection);
-            gl.glDisable(GL4.GL_CLIP_DISTANCE0);
+        if (waterToggle)
+        {
+            reflectBuffer.use(gl);
+
+                gl.glEnable(GL4.GL_CLIP_DISTANCE0);
+                renderScene(gl, mirror_view);
+                if (grassToggle)
+                    renderGrass(gl, mirror_view, projection);
+                
+                if (cloudToggle)
+                    renderClouds(gl, mirror_view, projection, time);
+                
+                gl.glDisable(GL4.GL_CLIP_DISTANCE0);
+        }
             
         pickingBuffer.use(gl);
         
@@ -283,12 +296,16 @@ public class ColourMonkey
         
             shadowBuffer.bindDepthBuffer(gl, GL4.GL_TEXTURE8);
         
-            renderScene(gl, true);
+            renderScene(gl);
 
             reflection.use(gl, GL.GL_TEXTURE6);
             renderWater(gl, view, projection);
             
-            renderGrass(gl, view, projection);
+            if (grassToggle)
+                renderGrass(gl, view, projection);
+            
+            if (cloudToggle)
+                renderClouds(gl, view, projection, time);
             
         if (ssaaToggle)
         {
@@ -310,19 +327,19 @@ public class ColourMonkey
         gl.glFlush();
     }
     
-    void renderScene(GL4 gl, boolean full)
+    void renderScene(GL4 gl)
     {
-        renderScene(gl, view, full);
+        renderScene(gl, view);
     }
-    void renderScene(GL4 gl, Mat4 camera, boolean full)
+    void renderScene(GL4 gl, Mat4 camera)
     {
-        renderScene(gl, camera, projection, full);
+        renderScene(gl, camera, projection);
     }
-    void renderScene(GL4 gl, Mat4 camera, Mat4 proj, boolean full)
+    void renderScene(GL4 gl, Mat4 camera, Mat4 proj)
     {
-        renderScene(gl, camera, proj, full, null);
+        renderScene(gl, camera, proj, null);
     }
-    void renderScene(GL4 gl, Mat4 camera, Mat4 proj, boolean full, Mesh skip)
+    void renderScene(GL4 gl, Mat4 camera, Mat4 proj, Mesh skip)
     {
         skyMap.use(gl, GL.GL_TEXTURE0);
         envMap.use(gl, GL.GL_TEXTURE9);
@@ -339,7 +356,6 @@ public class ColourMonkey
             tankShader.updateUniform(gl, "mo", moTank == i ? 1 : 0);
             renderMesh(gl, camera, proj, tankMesh, tanks[i], tankShader);
         }
-        if (full) renderClouds(gl, camera, proj, time);
     }
     
     void renderPostProcessing(GL4 gl)
@@ -392,11 +408,14 @@ public class ColourMonkey
             
             Mat4 emview = Utils.lookAtCube(new Vec3(t.xMove, t.yMove, t.zMove), GL4.GL_TEXTURE_CUBE_MAP_POSITIVE_X+i);
             
-            renderScene(gl, emview, emproj, true, mesh);
+            renderScene(gl, emview, emproj, mesh);
+            
+            if (cloudToggle)
+                renderClouds(gl, view, projection, time);
         }
     }
     
-    void renderSkybox(GL4 gl, Mat4 camera, Mat4 proj)
+    void renderSkybox(GL4 gl, Mat4 camera, Mat4 proj) 
     {
         sbShader.use(gl);
         
@@ -717,10 +736,22 @@ public class ColourMonkey
                 System.exit(0);
                 break;
             case '1':
+                ssaaToggle = !ssaaToggle;
+                break;
+            case '2':
                 shadowToggle = !shadowToggle;
                 break;
-            case '`':
-                ssaaToggle = !ssaaToggle;
+            case '3':
+                grassToggle = !grassToggle;
+                break;
+            case '4':
+                waterToggle = !waterToggle;
+                break;
+            case '5':
+                envToggle = !envToggle;
+                break;
+            case '6':
+                cloudToggle = !cloudToggle;
                 break;
             default:
                 break;
