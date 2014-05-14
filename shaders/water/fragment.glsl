@@ -1,7 +1,7 @@
 #version 420
 
 //
-// Description : Array and textureless GLSL 2D/3D/4D simplex 
+// Description : Array and textureless GLSL 2D/3D/4D simplex
 //               noise functions.
 //      Author : Ian McEwan, Ashima Arts.
 //  Maintainer : ijm
@@ -9,7 +9,7 @@
 //     License : Copyright (C) 2011 Ashima Arts. All rights reserved.
 //               Distributed under the MIT License. See LICENSE file.
 //               https://github.com/ashima/webgl-noise
-// 
+//
 
 vec3 mod289(vec3 x) {
   return x - floor(x * (1.0 / 289.0)) * 289.0;
@@ -29,7 +29,7 @@ vec4 taylorInvSqrt(vec4 r)
 }
 
 float snoise(vec3 v)
-  { 
+  {
   const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
   const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
 
@@ -52,10 +52,10 @@ float snoise(vec3 v)
   vec3 x3 = x0 - D.yyy;      // -1.0+3.0*C.x = -0.5 = -D.y
 
 // Permutations
-  i = mod289(i); 
-  vec4 p = permute( permute( permute( 
+  i = mod289(i);
+  vec4 p = permute( permute( permute(
              i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
-           + i.y + vec4(0.0, i1.y, i2.y, 1.0 )) 
+           + i.y + vec4(0.0, i1.y, i2.y, 1.0 ))
            + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
 
 // Gradients: 7x7 points over a square, mapped onto an octahedron.
@@ -99,7 +99,7 @@ float snoise(vec3 v)
 // Mix final noise value
   vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
   m = m * m;
-  return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), 
+  return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1),
                                 dot(p2,x2), dot(p3,x3) ) );
   }
 
@@ -130,7 +130,7 @@ layout (location = 0) out vec4 colour;
 vec3 samplesun(vec3 dir)
 {
     vec3 l = normalize(sun);
-    
+
     vec3 sun_colour;
 
     // different size radial gradients for each channel
@@ -153,17 +153,17 @@ float noise(vec3 v)
 void main()
 {
     float x = gl_FragCoord.x/float(screenWidth);
-    float y = gl_FragCoord.y/float(screenHeight);
+    float y = (gl_FragCoord.y)/float(screenHeight);
 
     vec3 normal = g_normal;
 
     vec3 v = normalize(w_eye-g_position);
 
     vec3 old_ref = normalize(reflect(-v, normal));
-    
-    float epsilon = 0.0001f;
 
-    float noise_scale = 0.005f;
+    float epsilon = 0.0005f;
+
+    float noise_scale = 0.001f;
 
     float nsample = snoise(vec3(g_position.xz,time));
     float f0 = (nsample+1)*noise_scale;
@@ -178,14 +178,18 @@ void main()
     vec3 l = normalize(sun);
     vec3 r = normalize(reflect(-l,normal));
 
+    float ia = 0.2f;
+    float id = 0.7f;
+
+    float ip = ia + max(dot(l,normal),0)*id;
+
     vec3 ref = normalize(reflect(-v, normal));
     vec3 sun_colour = samplesun(ref).xyz;
 
-    float yoffset = -noise_scale;
-    float xoffset = -(nsample*2-1)*noise_scale*2;
+    float xoffset = -nsample*noise_scale*2.0f;
+    float yoffset = -nsample*noise_scale*2.0f;
 
     vec3 reflection = texture(reflection, vec2(x+xoffset, 1-(y+yoffset))).xyz;
-
 
     vec3 dir = w_eye - g_position;
 
@@ -197,10 +201,10 @@ void main()
 
     vec3 water_tint = vec3(0.3046875f, 0.609375f, 0.55078125f);
 
-    float tint_amount = 0.5f;
-    float water_opacity = 0.5f;
+    float tint_amount = pow(max(dot(normal,v),0),2);
+    float water_opacity = 0.2f + (1.0f - pow(max(dot(normal,v),0),2)) * 0.8f;
 
-    colour = vec4(mix(sky, mix(reflection,water_tint,tint_amount)+sun_colour, fog_factor),
-        water_opacity+length(sun_colour));
+    colour = vec4(mix(sky, ip*(mix(reflection,water_tint,tint_amount)+sun_colour), fog_factor),
+        water_opacity+length(sun_colour)*tint_amount);
 }
 
