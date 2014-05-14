@@ -411,7 +411,7 @@ public class ColourMonkey
             renderScene(gl, emview, emproj, mesh);
 
             if (cloudToggle)
-                renderClouds(gl, view, projection, time);
+                renderClouds(gl, emview, emproj, time);
         }
     }
 
