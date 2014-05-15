@@ -63,16 +63,18 @@ public class Tree implements Drawable
     class Rotate implements Runnable
     {
         float amount;
+        Vec3 axis;
 
-        public Rotate(float amount)
+        public Rotate(float amount, Vec3 axis)
         {
             this.amount = amount;
+            this.axis = axis;
         }
         
         @Override
         public void run()
         {
-            Mat4 rot = Matrices.rotate(Mat4.MAT4_IDENTITY, amount, new Vec3(0,0,1));
+            Mat4 rot = Matrices.rotate(Mat4.MAT4_IDENTITY, amount, axis);
             state.dir = rot.multiply(state.dir.toDirection()).xyz().getUnitVector();
             
             
@@ -118,8 +120,17 @@ public class Tree implements Drawable
     private final ArrayList<Branch> branches = new ArrayList<Branch>();
     private GL4 gl;
     
-    private final Runnable F = new Forward(1.0f), L = new Rotate(30.0f),
-            R = new Rotate(-30.0f), _s = new SaveState(), s_ = new LoadState();
+    private static final Vec3 XAXIS = new Vec3(1,0,0),
+            YAXIS = new Vec3(0,1,0), ZAXIS = new Vec3(0,0,1);
+    
+    private final Runnable F = new Forward(1.0f),
+            _s = new SaveState(), s_ = new LoadState(),
+            Lz = new Rotate(30.0f,ZAXIS),
+            Rz = new Rotate(-30.0f, ZAXIS),
+            Lx = new Rotate(30.0f,XAXIS),
+            Rx = new Rotate(-30.0f, XAXIS),
+            Ly = new Rotate(30.0f,YAXIS),
+            Ry = new Rotate(-30.0f, YAXIS);
 
     public Tree(GL4 gl)
     {
@@ -128,9 +139,12 @@ public class Tree implements Drawable
         bmesh = new WavefrontMesh(gl, "branch.obj");
         
         lsys = new LSystem(new Runnable[]{F});
-        lsys.addRule(F, new Runnable[]{F, _s, L, F, s_, F, _s, R, F, s_, F});
-        lsys.addRule(L, new Runnable[]{L, F});
-        lsys.addRule(R, new Runnable[]{F, R});
+        lsys.addRule(F, new Runnable[]{F, _s, Lz, F, Lz, F,s_, _s, Rz, F, Rz, F, s_, F,
+                                    _s, Lx, F, Lx, F, s_, _s, Rx, F, Rx, F, s_});
+        lsys.addRule(Lz, new Runnable[]{Lz, F});
+        lsys.addRule(Rz, new Runnable[]{F, Rz});
+        lsys.addRule(Lx, new Runnable[]{Lx, F});
+        lsys.addRule(Rx, new Runnable[]{F, Rx});
         lsys.iterate(3);
         lsys.run();
         
