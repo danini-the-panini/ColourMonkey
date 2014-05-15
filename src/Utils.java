@@ -348,4 +348,16 @@ public class Utils {
         }
         return Matrices.lookAt(eye, at, up);
     }
+
+    public static void checkError(GL gl)
+    {
+        checkError(gl,"");
+    }
+    
+    public static void checkError(GL gl, String msg)
+    {
+        int error = gl.getGL().glGetError();
+        if (error != 0)
+            System.err.println("ERROR: " + error + ", " + msg);
+    }
 }

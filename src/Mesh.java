@@ -7,7 +7,7 @@ import java.nio.IntBuffer;
 import javax.media.opengl.GL;
 import javax.media.opengl.GL4;
 
-public abstract class Mesh
+public abstract class Mesh implements Drawable
 {
     public static final int VERTICES_PER_TRIANGLE = 3;
     public static final int TRIANGLES_PER_QUAD = 2;
@@ -31,7 +31,13 @@ public abstract class Mesh
        gl.glBindVertexArray(handle);
     }
     
-    public void draw(GL4 gl) {
+    @Override
+    public void draw(GL4 gl, Shader notUsedByDefault) {
+        this.draw(gl);
+    }
+    
+    public void draw(GL4 gl)
+    {
        bind(gl);
        
        gl.glDrawElements(GL.GL_TRIANGLES, indexArraySize, GL.GL_UNSIGNED_INT, 0);

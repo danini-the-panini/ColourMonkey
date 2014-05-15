@@ -13,17 +13,17 @@ import java.util.HashMap;
  *
  * @author daniel
  */
-public class LSystem<T>
+public class LSystem
 {
-    HashMap<T, T[]> rules = new HashMap<T, T[]>();
-    T[] state;
+    HashMap<Runnable, Runnable[]> rules = new HashMap<Runnable, Runnable[]>();
+    Runnable[] state;
 
-    public LSystem(T[] start)
+    public LSystem(Runnable[] start)
     {
         state = start;
     }
     
-    public void addRule(T from, T[] to)
+    public void addRule(Runnable from, Runnable[] to)
     {
         rules.put(from, to);
     }
@@ -33,6 +33,11 @@ public class LSystem<T>
     {
         return Arrays.toString(state);
     }
+
+    public Runnable[] getState()
+    {
+        return state;
+    }
     
     public void iterate(int n)
     {
@@ -41,11 +46,11 @@ public class LSystem<T>
             int i = 0;
             while (i < state.length)
             {
-                T from = state[i];
-                T[] replacement = rules.get(from);
+                Runnable from = state[i];
+                Runnable[] replacement = rules.get(from);
                 if (replacement != null)
                 {
-                    T[] newState = (T[])Array.newInstance(from.getClass(), state.length+replacement.length-1);
+                    Runnable[] newState = new Runnable[state.length+replacement.length-1];
                     System.arraycopy(state, 0, newState, 0, i);
                     System.arraycopy(replacement, 0, newState, i, replacement.length);
                     System.arraycopy(state, i+1, newState, i+replacement.length, state.length-i-1);
@@ -56,17 +61,6 @@ public class LSystem<T>
             }
             n--;
         }
-    }
-    
-    public static void main(String[] args)
-    {
-        LSystem<Character> lsys = new LSystem<Character>(new Character[]{'F'});
-        lsys.addRule('F', new Character[]{'<','L','F','>','<','R','F','>','F'});
-        System.out.println(lsys);
-        lsys.iterate(1);
-        System.out.println(lsys);
-        lsys.iterate(1);
-        System.out.println(lsys);
     }
     
 }

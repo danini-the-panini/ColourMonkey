@@ -39,6 +39,10 @@ public class ColourMonkey
     Transformation[] tanks = new Transformation[7];
     int chosenTank = 0;
     int moTank = -1;
+    
+    Shader treeShader;
+    Tree tree;
+    Transformation treeTransform = new Transformation();
 
     Shader sbShader, smShader;
     NDCQuad ndcQuad;
@@ -356,6 +360,9 @@ public class ColourMonkey
             tankShader.updateUniform(gl, "mo", moTank == i ? 1 : 0);
             renderMesh(gl, camera, proj, tankMesh, tanks[i], tankShader);
         }
+        treeShader.use(gl);
+        renderMesh(gl, camera, proj, tree, treeTransform, treeShader);
+        treeShader.use(gl);
     }
 
     void renderPostProcessing(GL4 gl)
@@ -502,7 +509,7 @@ public class ColourMonkey
         gl.glDisable(GL.GL_BLEND);
     }
 
-    void renderMesh(GL4 gl, Mat4 camera, Mat4 proj, Mesh mesh, Transformation t, Shader shader)
+    void renderMesh(GL4 gl, Mat4 camera, Mat4 proj, Drawable mesh, Transformation t, Shader shader)
     {
         shader.use(gl);
 
@@ -519,7 +526,7 @@ public class ColourMonkey
         shader.updateUniform(gl, "clipPlane", clipPlane);
         shader.updateUniform(gl, "clipWorld", clipWorld);
 
-        mesh.draw(gl);
+        mesh.draw(gl, shader);
     }
 
     void renderClouds(GL4 gl, Mat4 camera, Mat4 proj, float time)
@@ -617,6 +624,13 @@ public class ColourMonkey
         tankMesh = new WavefrontMesh(gl, "tank.obj");
 
         tankShader = new Shader(gl, "monkey");
+        
+        tree = new Tree(gl);
+        treeShader = new Shader(gl, "tree");
+        treeTransform.yMove = -4.5f;
+        treeTransform.xMove = -50.0f;
+        treeTransform.zMove = -3.0f;
+        treeTransform.xScale = treeTransform.yScale = treeTransform.zScale = 5.0f;
 
         waterShader = new Shader(gl, "water");
         water = new Grid(gl, 512, 512, 20, 20, water_level);
