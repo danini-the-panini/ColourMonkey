@@ -13,7 +13,7 @@ import java.util.HashMap;
  *
  * @author daniel
  */
-public class LSystem
+public class LSystem implements Runnable
 {
     HashMap<Runnable, Runnable[]> rules = new HashMap<Runnable, Runnable[]>();
     Runnable[] state;
@@ -57,10 +57,51 @@ public class LSystem
                     state = newState;
                     i += replacement.length;
                 }
-                i++;
+                else i++;
             }
             n--;
         }
+    }
+
+    @Override
+    public void run()
+    {
+        for (Runnable r : state)
+            r.run();
+    }
+    
+    static class x implements Runnable
+    {
+        char z;
+
+        public x(char z)
+        {
+            this.z = z;
+        }
+
+        @Override
+        public void run()
+        {
+            System.out.print(z);
+        }
+        
+        
+    }
+    
+    private static final Runnable F = new x('F'), L = new x('L'),
+            R = new x('R'), _s = new x('<'), s_ = new x('>');
+    
+    public static void main(String[] args)
+    {
+        LSystem lsys = new LSystem(new Runnable[]{F});
+        lsys.addRule(F, new Runnable[]{F, _s, L, F, s_, F, _s, R, F, s_, F});
+        lsys.addRule(L, new Runnable[]{L, F});
+        lsys.addRule(R, new Runnable[]{F, R});
+        lsys.run(); System.out.println();
+        lsys.iterate(1);
+        lsys.run(); System.out.println();
+        lsys.iterate(1);
+        lsys.run(); System.out.println();
     }
     
 }

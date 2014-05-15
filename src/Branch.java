@@ -45,7 +45,10 @@ public class Branch implements Drawable
         }
         Mat4 mat = parent.getTreeMat();
         mat = Matrices.translate(mat, origin);
-        mat = Matrices.rotate(mat, (float)Math.toDegrees(axis.angleInRadians(parent.axis)), tangent);
+        if (!axis.equals(parent.axis))
+        {
+            mat = Matrices.rotate(mat, (float)Math.toDegrees(axis.angleInRadians(parent.axis)), tangent);
+        }
         return mat;
     }
 

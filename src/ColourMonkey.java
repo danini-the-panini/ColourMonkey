@@ -630,7 +630,7 @@ public class ColourMonkey
         treeTransform.yMove = -4.5f;
         treeTransform.xMove = -50.0f;
         treeTransform.zMove = -3.0f;
-        treeTransform.xScale = treeTransform.yScale = treeTransform.zScale = 5.0f;
+//        treeTransform.xScale = treeTransform.yScale = treeTransform.zScale = 5.0f;
 
         waterShader = new Shader(gl, "water");
         water = new Grid(gl, 512, 512, 20, 20, water_level);

@@ -46,11 +46,16 @@ public class Tree implements Drawable
             Vec3 tangent = parent == null ? new Vec3(0,0,1) :
                     parent.getAxis().cross(state.dir).getUnitVector();
             
+            if (tangent.equalsWithEpsilon(Vec3.VEC3_ZERO, 0.0001f))
+                tangent = new Vec3(0,0,1);
+            
             branches.add(new Branch(gl, parent, new Vec3(0,amount,0), state.dir,
                     tangent, bmesh));
             
             state.branch = branches.size()-1;
             state.pos = state.pos.add(state.dir.scale(amount));
+            
+            System.out.print(":F ");
         }
         
     }
@@ -69,6 +74,9 @@ public class Tree implements Drawable
         {
             Mat4 rot = Matrices.rotate(Mat4.MAT4_IDENTITY, amount, new Vec3(0,0,1));
             state.dir = rot.multiply(state.dir.toDirection()).xyz().getUnitVector();
+            
+            
+            System.out.print(amount < 0 ? ":R " : ":L ");
         }
         
     }
@@ -86,6 +94,8 @@ public class Tree implements Drawable
             newState.previous = state;
             
             state = newState;
+            
+            System.out.print(":< ");
         }
         
     }
@@ -97,6 +107,8 @@ public class Tree implements Drawable
         public void run()
         {
             state = state.previous;
+            
+            System.out.print(":> ");
         }
         
     }
@@ -116,10 +128,11 @@ public class Tree implements Drawable
         bmesh = new WavefrontMesh(gl, "branch.obj");
         
         lsys = new LSystem(new Runnable[]{F});
-        lsys.addRule(F, new Runnable[]{F, _s, L, F, s_, _s, R, F, s_});
+        lsys.addRule(F, new Runnable[]{F, _s, L, F, s_, F, _s, R, F, s_, F});
+        lsys.addRule(L, new Runnable[]{L, F});
+        lsys.addRule(R, new Runnable[]{F, R});
         lsys.iterate(3);
-        for (Runnable r : lsys.getState())
-            r.run();
+        lsys.run();
         
         System.out.println("Num Branches: " + branches.size());
         
