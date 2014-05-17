@@ -24,10 +24,17 @@ public class Shader
     private int tessContShader;
     private int tessEvalShader;
     private int fragmentShader;
+    
+    private String[] feedbackVaryings = null;
 
     private HashMap<String,Integer> uniforms = new HashMap<String,Integer>();
-
+    
     public Shader(GL4 gl, String name)
+    {
+        this(gl,name,null);
+    }
+
+    public Shader(GL4 gl, String name, String[] feedbackVaryings)
     {
         System.out.println("Loading shader " + name);
 
@@ -46,6 +53,12 @@ public class Shader
        if (tessContShader != -1) gl.glAttachShader(program, tessContShader);
        if (tessEvalShader != -1) gl.glAttachShader(program, tessEvalShader);
        if (fragmentShader != -1) gl.glAttachShader(program, fragmentShader);
+       
+       // optional transform feedback
+       if (feedbackVaryings != null)
+       {
+           gl.glTransformFeedbackVaryings(program, feedbackVaryings.length, feedbackVaryings, GL4.GL_INTERLEAVED_ATTRIBS);
+       }
 
        /* Finally, the program must be linked. */
        gl.glLinkProgram(program);
@@ -64,7 +77,12 @@ public class Shader
         return program;
     }
 
-    int findUniform(GL4 gl, String name, int program)
+    public void setFeedbackVaryings(String[] feedbackVaryings)
+    {
+        this.feedbackVaryings = feedbackVaryings;
+    }
+
+    public int findUniform(GL4 gl, String name)
     {
        Integer uniform = uniforms.get(name);
        if (uniform == null)
@@ -74,38 +92,55 @@ public class Shader
        }
        return uniform;
     }
+    
+    public void bindUniformBlock(GL4 gl, String name, int bindingPt)
+    {
+        gl.glUniformBlockBinding(program, findUniformBlock(gl, name), bindingPt);
+    }
+    
+    
+    public int findUniformBlock(GL4 gl, String name)
+    {
+       Integer uniform = uniforms.get(name);
+       if (uniform == null)
+       {
+         uniform = gl.glGetUniformBlockIndex(program, name);
+         uniforms.put(name, uniform);
+       }
+       return uniform;
+    }
 
     public void updateUniform(GL4 gl, String name, Mat4 value)
     {
-        int uniform = findUniform(gl, name, program);
+        int uniform = findUniform(gl, name);
         if (uniform == -1) return;
         gl.glUniformMatrix4fv(uniform, 1, false, value.getBuffer());
     }
 
     public void updateUniform(GL4 gl, String name, float value)
     {
-        int uniform = findUniform(gl, name, program);
+        int uniform = findUniform(gl, name);
         if (uniform == -1) return;
         gl.glUniform1f(uniform, value);
     }
 
     public void updateUniform(GL4 gl, String name, Vec3 value)
     {
-        int uniform = findUniform(gl, name, program);
+        int uniform = findUniform(gl, name);
         if (uniform == -1) return;
         gl.glUniform3fv(uniform, 1, value.getBuffer());
     }
 
     public void updateUniform(GL4 gl, String name, Vec4 value)
     {
-        int uniform = findUniform(gl, name, program);
+        int uniform = findUniform(gl, name);
         if (uniform == -1) return;
         gl.glUniform4fv(uniform, 1, value.getBuffer());
     }
 
     public void updateUniform(GL4 gl, String name, int value)
     {
-        int uniform = findUniform(gl, name, program);
+        int uniform = findUniform(gl, name);
         if (uniform == -1) return;
         gl.glUniform1i(uniform, value);
     }

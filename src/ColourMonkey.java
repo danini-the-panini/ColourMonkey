@@ -525,6 +525,8 @@ public class ColourMonkey
 
         shader.updateUniform(gl, "clipPlane", clipPlane);
         shader.updateUniform(gl, "clipWorld", clipWorld);
+        
+        shader.updateUniform(gl, "time", time);
 
         mesh.draw(gl, shader);
     }
@@ -625,8 +627,8 @@ public class ColourMonkey
 
         tankShader = new Shader(gl, "monkey");
         
-        tree = new Tree(gl);
         treeShader = new Shader(gl, "tree");
+        tree = new Tree(gl, treeShader);
         treeTransform.yMove = -4.5f;
         treeTransform.xMove = -50.0f;
         treeTransform.zMove = -3.0f;

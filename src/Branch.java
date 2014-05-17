@@ -16,6 +16,7 @@ import javax.media.opengl.GL4;
  */
 public class Branch implements Drawable
 {
+    private final int parent_id;
     private final Branch parent;
     private final Vec3 origin;
     private final Vec3 axis;
@@ -23,27 +24,50 @@ public class Branch implements Drawable
     
     private final Mesh mesh;
     
-    public Branch(GL4 gl, Branch parent, Vec3 origin, Vec3 axis, Vec3 tangent, Mesh mesh)
+    public Branch(GL4 gl, int parent_id, Branch parent, Vec3 origin, Vec3 axis, Vec3 tangent, Mesh mesh)
     {
         this.parent = parent;
+        this.parent_id = parent_id;
         this.origin = origin;
         this.axis = axis;
         this.tangent = tangent;
         this.mesh = mesh;
     }
 
+    public int getParentID()
+    {
+        return parent_id;
+    }
+
+    public Vec3 getOrigin()
+    {
+        return origin;
+    }
     public Vec3 getAxis()
     {
         return axis;
     }
-    
+
+    public Vec3 getTangent()
+    {
+        return tangent;
+    }
+
     public Mat4 getTreeMat()
     {
         if (parent == null)
         {
             return Mat4.MAT4_IDENTITY;
         }
-        Mat4 mat = parent.getTreeMat();
+        return parent.getTreeMat().multiply(getLocalMat());
+    }
+    
+    public Mat4 getLocalMat()
+    {
+        if (parent == null)
+            return Mat4.MAT4_IDENTITY;
+            
+        Mat4 mat = Mat4.MAT4_IDENTITY;
         mat = Matrices.translate(mat, origin);
         if (!axis.equals(parent.axis))
         {
