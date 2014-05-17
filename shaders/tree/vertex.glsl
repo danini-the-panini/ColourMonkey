@@ -18,25 +18,28 @@ uniform mat4 tree_world;
 
 uniform float time;
 
+const int MAXB = 256;
+
 layout (std430) uniform parent_block {
-  int parents[100];
+  int parents[MAXB];
 };
 layout (std430) uniform origin_block {
-  vec3 origins[100];
+  vec3 origins[MAXB];
 };
 layout (std430) uniform axis_block {
-  vec3 axes[100];
+  vec3 axes[MAXB];
 };
 layout (std430) uniform tangent_block {
-  vec3 tangents[100];
+  vec3 tangents[MAXB];
 };
 layout (std430) uniform world_block {
-  mat4 worlds[100];
+  mat4 worlds[MAXB];
 };
 
 out vec3 g_normal;
 out vec3 g_position;
 out vec3 w_eye;
+out vec3 g_colour;
 
 out vec4 l_position;
 
@@ -45,9 +48,13 @@ const mat4 bias = mat4 (.5f, .0f, .0f, .0f,
                         .0f, .0f, .5f, .0f,
                         .5f, .5f, .5f, 1.f);
 
+const vec3 colours[] = {
+  vec3(1,0,1), vec3(1,0,0), vec3(0,1,0),vec3(0,0,1),vec3(1,1,0),vec3(0,1,1),vec3(1,1,1),vec3(0.3f,0.3f,0.3f)
+};
+
 float rand(vec2 n)
 {
-  return 0.5 + 0.5 * 
+  return 0.5 + 0.5 *
      fract(sin(dot(n.xy, vec2(12.9898, 78.233)))* 43758.5453);
 }
 
@@ -56,7 +63,7 @@ vec4 quatAxisAngle(vec3 axis, float angle)
   angle *= 0.5;
   float s = sin(angle);
   float c = cos(angle);
-  
+
   return vec4(s*normalize(axis), c);
 }
 
@@ -122,7 +129,7 @@ vec4 slerp(vec4 from, vec4 to, float t)
       scale1 = sin(t * omega) / sinom;
   } else
   {
-  // "from" and "to" quaternions are very close 
+  // "from" and "to" quaternions are very close
       //  ... so we can do a linear interpolation
       scale0 = 1.0f - t;
       scale1 = t;
@@ -149,10 +156,10 @@ vec4 qmult(vec4 a, vec4 b)
 mat4 bendBranch(vec3 pos,
                   vec3 branchOrigin,
                   float  branchNoise,
-                  vec3 windDir, 
+                  vec3 windDir,
                   float  windPower)
 {
-  float towardsX = dot(normalize(vec3(pos.x, 0.0f, pos.z)), vec3(1.0f, 0.0f, 0.0f));  
+  float towardsX = dot(normalize(vec3(pos.x, 0.0f, pos.z)), vec3(1.0f, 0.0f, 0.0f));
   float facingWind = dot(normalize(vec3(pos.x, 0.0f, pos.z)), windDir);
   float a = cos(time + branchNoise * rand(branchOrigin.xy));
   float b = cos(time + branchNoise * rand(branchOrigin.xy));
@@ -168,18 +175,16 @@ mat4 bendBranch(vec3 pos,
 
 mat4 bendTree(int b)
 {
-  mat4 w;
+  mat4 w = mat4(1.0f);
   int i = 0;
 
-  do
+  for (int i = 0; i < MAXB; i++)
   {
     w = worlds[b] * w;// * bendBranch(axes[b], origins[b], 0.1f,
       // vec3(1.0f,0.0f,0.0f), 1.0f) * w;
 
     b = parents[b];
-    i = i+1;
   }
-  while (b != -1 && i < 100);
 
   return w;
 }
@@ -188,11 +193,12 @@ void main()
 {
     w_eye = (inverse(view) * vec4 (0, 0, 1, 1)).xyz;
 
-    mat4 new_world = world * bendTree(branch);
+    mat4 new_world = world * worlds[branch] * tree_world; //worlds[parents[parents[branch]]] * worlds[parents[branch]] * worlds[branch];//bendTree(branch);
 
     g_normal = normalize((new_world *  vec4(normal,0.0f)).xyz);
     g_position = (new_world * vec4(position,1.0f)).xyz;
     l_position = bias * lprojection * lview * new_world * vec4(position,1.0f);
+    g_colour = colours[branch%colours.length()];
     gl_Position = projection * view * new_world * vec4(position,1.0f);
     gl_ClipDistance[0] = dot(clipWorld * new_world * vec4(position,1.0f), clipPlane);
 }

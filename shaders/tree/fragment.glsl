@@ -70,7 +70,7 @@ void main()
             ip = mix (ip, ia, shadow);
     }
 
-    vec3 col = vec3(1.0f,0.0f,1.0f) * ip;
+    vec3 col = g_colour * ip;
 
     colour = vec4(col, 1.0f);
 }

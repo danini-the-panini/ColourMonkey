@@ -1,6 +1,8 @@
 
+import com.hackoeur.jglm.Mat;
 import com.hackoeur.jglm.Mat4;
 import com.hackoeur.jglm.Matrices;
+import com.hackoeur.jglm.Vec;
 import com.hackoeur.jglm.Vec3;
 import com.jogamp.common.nio.Buffers;
 import java.nio.ByteBuffer;
@@ -27,7 +29,7 @@ public class Tree implements Drawable
     {
         Vec3 pos = Vec3.VEC3_ZERO;
         Vec3 dir = new Vec3(0, 1, 0);
-        int branch = -1;
+        int branch = 0;
         LState previous = null;
     }
     
@@ -45,14 +47,12 @@ public class Tree implements Drawable
         @Override
         public void run()
         {
-            Branch parent = state.branch == -1 ? null : branches.get(state.branch);
-            Vec3 tangent = parent == null ? new Vec3(0,0,1) :
-                    parent.getAxis().cross(state.dir).getUnitVector();
+            Branch parent = branches.get(state.branch);
+            Vec3 tangent = parent.getAxis().equalsWithEpsilon(state.dir)
+                    ? new Vec3(0,0,1)
+                    : parent.getAxis().cross(state.dir).getUnitVector();
             
-            if (tangent.equalsWithEpsilon(Vec3.VEC3_ZERO, 0.0001f))
-                tangent = new Vec3(0,0,1);
-            
-            branches.add(new Branch(gl, state.branch, parent, new Vec3(0,amount,0), state.dir,
+            branches.add(new Branch(gl, state.branch, parent, amount, new Vec3(0,parent.getLength(),0), state.dir,
                     tangent, bmesh));
             
             state.branch = branches.size()-1;
@@ -144,6 +144,7 @@ public class Tree implements Drawable
         this.gl = gl;
         
         bmesh = new WavefrontMesh(gl, "branch.obj");
+        branches.add(new Branch(gl, 0, null, 0.0f, Vec3.VEC3_ZERO, state.dir, Vec3.VEC3_ZERO, bmesh));
         
         lsys = new LSystem(new Runnable[]{F});
         lsys.addRule(F, new Runnable[]{F, _s, Lz, F, Lz, F,s_, _s, Rz, F, Rz, F, s_, F,
@@ -162,24 +163,14 @@ public class Tree implements Drawable
         ByteBuffer axisData = Buffers.newDirectByteBuffer(branches.size()*VEC3_SIZE);
         ByteBuffer tangentData = Buffers.newDirectByteBuffer(branches.size()*VEC3_SIZE);
         ByteBuffer worldData = Buffers.newDirectByteBuffer(branches.size()*MAT4_SIZE);
-        Vec3 v;
         for (Branch b : branches)
         {
+            System.out.println("Adding parent: " + b.getParentID());
             parentData.putInt(b.getParentID());
-            v = b.getOrigin();
-            originData.putFloat(v.getX());
-            originData.putFloat(v.getY());
-            originData.putFloat(v.getZ());
-            v = b.getAxis();
-            axisData.putFloat(v.getX());
-            axisData.putFloat(v.getY());
-            axisData.putFloat(v.getZ());
-            v = b.getTangent();
-            tangentData.putFloat(v.getX());
-            tangentData.putFloat(v.getY());
-            tangentData.putFloat(v.getZ());
-            
-            worldData.put(Buffers.copyFloatBufferAsByteBuffer(b.getLocalMat().getBuffer()));
+            putVec(b.getOrigin(), originData);
+            putVec(b.getAxis(), axisData);
+            putVec(b.getTangent(), tangentData);
+            putMat(b.getParent() == null ? Mat4.MAT4_IDENTITY : b.getParent().getTreeMat(),worldData);
         }
         
         parentData.flip();
@@ -188,16 +179,25 @@ public class Tree implements Drawable
         tangentData.flip();
         worldData.flip();
         
-        linkUniformBuffer("parent_block", parentData, shader);
-        linkUniformBuffer("origin_block", originData, shader);
-        linkUniformBuffer("axis_block", axisData, shader);
-        linkUniformBuffer("tangent_block", tangentData, shader);
-        linkUniformBuffer("world_block", worldData, shader);
+        linkUniformBuffer("parent_block", parentData, branches.size()*INT_SIZE, shader);
+        linkUniformBuffer("origin_block", originData, branches.size()*VEC3_SIZE, shader);
+        linkUniformBuffer("axis_block", axisData, branches.size()*VEC3_SIZE, shader);
+        linkUniformBuffer("tangent_block", tangentData, branches.size()*VEC3_SIZE, shader);
+        linkUniformBuffer("world_block", worldData, branches.size()*MAT4_SIZE, shader);
         
         Utils.checkError(gl, "Tree");
     }
     
-    private void linkUniformBuffer(String name, ByteBuffer buff, Shader shader)
+    private void putVec(Vec v, ByteBuffer buf)
+    {
+        buf.put(Buffers.copyFloatBufferAsByteBuffer(v.getBuffer()));
+    }
+    private void putMat(Mat m, ByteBuffer buf)
+    {
+        buf.put(Buffers.copyFloatBufferAsByteBuffer(m.getBuffer()));
+    }
+    
+    private void linkUniformBuffer(String name, ByteBuffer buff, int size, Shader shader)
     {
         int bindingPoint = 1;
         IntBuffer buffer = Buffers.newDirectIntBuffer(1);
@@ -208,7 +208,7 @@ public class Tree implements Drawable
         int bufferVal = buffer.get();
         gl.glBindBuffer(GL4.GL_UNIFORM_BUFFER, bufferVal);
 
-        gl.glBufferData(GL4.GL_UNIFORM_BUFFER, branches.size()*INT_SIZE, buff, GL4.GL_DYNAMIC_DRAW);
+        gl.glBufferData(GL4.GL_UNIFORM_BUFFER, size, buff, GL4.GL_DYNAMIC_DRAW);
         gl.glBindBufferBase(GL4.GL_UNIFORM_BUFFER, bindingPoint, bufferVal);
     }
     
@@ -219,7 +219,7 @@ public class Tree implements Drawable
     {
         
         int len = branches.size();
-        for (int i = 0; i < len; i++)
+        for (int i = 1; i < len; i++)
         {
             shader.updateUniform(gl, "branch", i);
             branches.get(i).draw(gl, shader);
