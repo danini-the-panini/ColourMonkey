@@ -74,6 +74,13 @@ public class Branch implements Drawable
         return parent.getTreeMat().multiply(getLocalMat());
     }
     
+    public Mat4 getParentTreeMat()
+    {
+        if (parent == null)
+            return Mat4.MAT4_IDENTITY;
+        return parent.getTreeMat();
+    }
+    
     public Mat4 getLocalMat()
     {
         if (parent == null)
@@ -91,7 +98,7 @@ public class Branch implements Drawable
     @Override
     public void draw(GL4 gl, Shader shader)
     {
-        shader.updateUniform(gl, "tree_world", getLocalMat());
+        shader.updateUniform(gl, "tree_world", getTreeMat());
         
         mesh.draw(gl, shader);
         Utils.checkError(gl, "BranchDrawing");

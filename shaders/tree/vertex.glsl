@@ -178,10 +178,10 @@ mat4 bendTree(int b)
   mat4 w = mat4(1.0f);
   int i = 0;
 
-  for (int i = 0; i < MAXB; i++)
+  while (b > 0)
   {
-    w = worlds[b] * w;// * bendBranch(axes[b], origins[b], 0.1f,
-      // vec3(1.0f,0.0f,0.0f), 1.0f) * w;
+    w = worlds[b] * bendBranch(axes[b], origins[b], 0.3f,
+      vec3(1.0f,0.0f,0.0f), 0.1f) * w;
 
     b = parents[b];
   }
@@ -193,7 +193,7 @@ void main()
 {
     w_eye = (inverse(view) * vec4 (0, 0, 1, 1)).xyz;
 
-    mat4 new_world = world * worlds[branch] * tree_world; //worlds[parents[parents[branch]]] * worlds[parents[branch]] * worlds[branch];//bendTree(branch);
+    mat4 new_world = world * bendTree(branch);//worlds[parents[parents[branch]]] * worlds[parents[branch]] * worlds[branch];
 
     g_normal = normalize((new_world *  vec4(normal,0.0f)).xyz);
     g_position = (new_world * vec4(position,1.0f)).xyz;
