@@ -165,6 +165,7 @@ public class Tree implements Drawable
         FloatBuffer axisData = Buffers.newDirectFloatBuffer(branches.size()*VEC3_SIZE);
         FloatBuffer tangentData = Buffers.newDirectFloatBuffer(branches.size()*VEC3_SIZE);
         FloatBuffer worldData = Buffers.newDirectFloatBuffer(branches.size()*MAT4_SIZE);
+        FloatBuffer treeWorldData = Buffers.newDirectFloatBuffer(branches.size()*MAT4_SIZE);
         for (Branch b : branches)
         {
             System.out.println("Adding parent: " + b.getParentID());
@@ -173,6 +174,7 @@ public class Tree implements Drawable
             axisData.put(b.getAxis().getBuffer());
             tangentData.put(b.getTangent().getBuffer());
             worldData.put(b.getLocalMat().getBuffer());
+            treeWorldData.put(b.getTreeMat().getBuffer());
         }
         
         parentData.flip();
@@ -180,12 +182,14 @@ public class Tree implements Drawable
         axisData.flip();
         tangentData.flip();
         worldData.flip();
+        treeWorldData.flip();
         
         linkUniformBuffer("parent_block", parentData, branches.size()*INT_SIZE, shader,1);
         linkUniformBuffer("origin_block", originData, branches.size()*VEC3_SIZE, shader,2);
         linkUniformBuffer("axis_block", axisData, branches.size()*VEC3_SIZE, shader,3);
         linkUniformBuffer("tangent_block", tangentData, branches.size()*VEC3_SIZE, shader,4);
         linkUniformBuffer("world_block", worldData, branches.size()*MAT4_SIZE, shader,5);
+        linkUniformBuffer("tree_world_block", treeWorldData, branches.size()*MAT4_SIZE, shader,6);
         
         Utils.checkError(gl, "Tree");
     }
@@ -221,7 +225,7 @@ public class Tree implements Drawable
     @Override
     public void draw(GL4 gl, Shader shader)
     {
-        shader.updateUniform(gl, "noise", calculateNoise(ColourMonkey.Time));
+        shader.updateUniform(gl, "noise", calculateNoise(ColourMonkey.Time*0.1f));
         
         int len = branches.size();
         for (int i = 1; i < len; i++)

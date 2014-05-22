@@ -15,6 +15,7 @@ uniform vec4 clipPlane;
 
 uniform int branch;
 uniform mat4 tree_world;
+uniform float noise;
 
 uniform float time;
 
@@ -34,6 +35,9 @@ layout (std430) uniform tangent_block {
 };
 layout (std430) uniform world_block {
   mat4 worlds[MAXB];
+};
+layout (std430) uniform tree_world_block {
+  mat4 tree_worlds[MAXB];
 };
 
 out vec3 g_normal;
@@ -152,25 +156,32 @@ vec4 qmult(vec4 a, vec4 b)
   return vec4(y1, y2, y3, y0);
 }
 
+
 // bend branch function from GPU Gems 3, Chapter 6
 mat4 bendBranch(vec3 pos,
                   vec3 branchOrigin,
                   float  branchNoise,
                   vec3 windDir,
+                  vec3 windTangent,
                   float  windPower)
 {
-  float towardsX = dot(normalize(vec3(pos.x, 0.0f, pos.z)), vec3(1.0f, 0.0f, 0.0f));
-  float facingWind = dot(normalize(vec3(pos.x, 0.0f, pos.z)), windDir);
-  float a = cos(time + branchNoise * rand(branchOrigin.xy));
-  float b = cos(time + branchNoise * rand(branchOrigin.xy));
+  vec3 branchPos = pos - branchOrigin;
+
+  float towards = dot(normalize(vec3(branchPos.x,0,branchPos.z)), vec3(1,0,0));
+  float facing  = dot(normalize(vec3(branchPos.x,0,branchPos.z)), windDir);
+
+  float a = cos(time + branchNoise);
+  float b = cos((time-1) + branchNoise);
+
   float oldA = a;
   a = -0.5f * a;
   b *= windPower;
-  a = mix(oldA * windPower, a * windPower, clamp(1.0f - facingWind,0.0f,1.0f));
-  vec3 windTangent = vec3(-windDir.z, windDir.y, windDir.x);
-  vec4 rotation1 = quatAxisAngle(windTangent, a);
-  vec4 rotation2 = quatAxisAngle(vec3(0.0f,1.0f,0.0f),b);
-  return toMat4(slerp(rotation1, rotation2, 1.0f - abs(facingWind)));
+  a = mix(oldA * windPower, a * windPower, clamp(1-facing,0.0f,1.0f));
+
+  vec4 rot1 = quatAxisAngle(windTangent, a);
+  vec4 rot2 = quatAxisAngle(vec3(0,1,0), b);
+
+  return toMat4(slerp(rot1,rot2, 1-abs(facing)));
 }
 
 mat4 bendTree(int b)
@@ -180,8 +191,9 @@ mat4 bendTree(int b)
 
   while (b > 0)
   {
-    w = worlds[b] * bendBranch(axes[b], origins[b], 0.3f,
-      vec3(1.0f,0.0f,0.0f), 0.1f) * w;
+    w = worlds[b] * bendBranch((tree_worlds[b]*vec4(axes[b],1)).xyz,
+      (tree_worlds[b]*vec4(origins[b],1)).xyz, noise,
+      vec3(1.0f,0.0f,0.0f), vec3(0.0f,0.0f,1.0f), 0.1f) * w;
 
     b = parents[b];
   }
