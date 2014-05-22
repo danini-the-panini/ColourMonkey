@@ -129,7 +129,7 @@ public class ColourMonkey
     boolean[] keys = new boolean[1024];
 
     long lastUpdate;
-    float time = 0.0f;
+    static float Time = 0.0f;
 
     boolean shadowToggle = true, ssaaToggle = false, grassToggle = true,
             waterToggle = true, envToggle = true, cloudToggle = true;
@@ -154,7 +154,7 @@ public class ColourMonkey
         long nanos = nTime-lastUpdate;
         lastUpdate = nTime;
         float delta = nanos/(float)NANOS_PER_SECOND;
-        time += delta;
+        Time += delta;
         lastFPSUpdate += delta;
 
 	if (lastFPSUpdate > 1.0f)
@@ -272,7 +272,7 @@ public class ColourMonkey
                     renderGrass(gl, mirror_view, projection);
 
                 if (cloudToggle)
-                    renderClouds(gl, mirror_view, projection, time);
+                    renderClouds(gl, mirror_view, projection, Time);
 
                 gl.glDisable(GL4.GL_CLIP_DISTANCE0);
         }
@@ -309,7 +309,7 @@ public class ColourMonkey
                 renderGrass(gl, view, projection);
 
             if (cloudToggle)
-                renderClouds(gl, view, projection, time);
+                renderClouds(gl, view, projection, Time);
 
         if (ssaaToggle)
         {
@@ -418,7 +418,7 @@ public class ColourMonkey
             renderScene(gl, emview, emproj, mesh);
 
             if (cloudToggle)
-                renderClouds(gl, emview, emproj, time);
+                renderClouds(gl, emview, emproj, Time);
         }
     }
 
@@ -502,7 +502,7 @@ public class ColourMonkey
 
         tpShader.updateUniform(gl, "water_level", water_level);
 
-        tpShader.updateUniform(gl, "time", time);
+        tpShader.updateUniform(gl, "time", Time);
 
         terrainPoints.drawPoints(gl);
         gl.glEnable(GL.GL_CULL_FACE);
@@ -526,7 +526,7 @@ public class ColourMonkey
         shader.updateUniform(gl, "clipPlane", clipPlane);
         shader.updateUniform(gl, "clipWorld", clipWorld);
         
-        shader.updateUniform(gl, "time", time);
+        shader.updateUniform(gl, "time", Time);
 
         mesh.draw(gl, shader);
     }
@@ -565,7 +565,7 @@ public class ColourMonkey
         waterShader.updateUniform(gl, "view", camera);
         waterShader.updateUniform(gl, "projection", proj);
         waterShader.updateUniform(gl, "sun", sun);
-        waterShader.updateUniform(gl, "time", time);
+        waterShader.updateUniform(gl, "time", Time);
         waterShader.updateUniform(gl, "fog_start", fog_start);
         waterShader.updateUniform(gl, "fog_end", fog_end);
 

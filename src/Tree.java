@@ -11,7 +11,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import javax.media.opengl.GL4;
-
+import static java.lang.Math.*;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -213,9 +213,15 @@ public class Tree implements Drawable
         gl.glBindBufferBase(GL4.GL_UNIFORM_BUFFER, bindingPoint, bufferVal);
     }
     
+    private float calculateNoise(float t)
+    {
+        return (float)((sin(PI*t) + sin(PI*3*t) + sin(PI*5*t) + sin(PI*7f*t)) / 4.0);
+    }
+    
     @Override
     public void draw(GL4 gl, Shader shader)
     {
+        shader.updateUniform(gl, "noise", calculateNoise(ColourMonkey.Time));
         
         int len = branches.size();
         for (int i = 1; i < len; i++)
