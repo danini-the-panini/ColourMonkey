@@ -210,7 +210,7 @@ void main()
     g_normal = normalize((new_world *  vec4(normal,0.0f)).xyz);
     g_position = (new_world * vec4(position,1.0f)).xyz;
     l_position = bias * lprojection * lview * new_world * vec4(position,1.0f);
-    g_colour = colours[branch%colours.length()];
+    g_colour = vec3(0.3f,0.2f,0.0f);//colours[branch%colours.length()];
     gl_Position = projection * view * new_world * vec4(position,1.0f);
     gl_ClipDistance[0] = dot(clipWorld * new_world * vec4(position,1.0f), clipPlane);
 }
